@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-cream text-nero font-sans antialiased;
+    font-variant-numeric: tabular-nums;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .btn-brutal {
+    @apply border-2 border-nero rounded-xl font-bold cursor-pointer transition-all duration-100;
+    box-shadow: 2px 2px 0 #1a1a1a;
+  }
+
+  .btn-brutal:hover {
+    box-shadow: 3px 3px 0 #1a1a1a;
+    transform: translate(-0.5px, -0.5px);
+  }
+
+  .btn-brutal:active {
+    transform: translate(2px, 2px);
+    box-shadow: 0px 0px 0 #1a1a1a;
+  }
+
+  .btn-brutal:disabled {
+    @apply opacity-40 cursor-not-allowed;
+    box-shadow: 1px 1px 0 #1a1a1a;
+    transform: none;
+  }
+
+  .card-brutal {
+    @apply border border-nero/10 rounded-2xl bg-white;
+    box-shadow: 0 1px 3px rgba(26, 26, 26, 0.06), 0 4px 12px rgba(26, 26, 26, 0.04);
+  }
+
+  .input-brutal {
+    @apply border-2 border-nero/15 rounded-xl px-3 py-2 text-sm font-semibold bg-cream outline-none font-sans w-full transition-all duration-150;
+    box-shadow: 0 1px 2px rgba(26, 26, 26, 0.04);
+  }
+
+  .input-brutal:focus {
+    box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.15);
+    border-color: #4ECDC4;
+  }
+}
+
+@layer utilities {
+  .animate-shimmer {
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}

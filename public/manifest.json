@@ -1,0 +1,16 @@
+{
+  "name": "Budget Tracker",
+  "short_name": "Budget",
+  "description": "Quan ly chi tieu ca nhan",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFDF7",
+  "theme_color": "#FFFDF7",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}
