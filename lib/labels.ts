@@ -5,38 +5,104 @@
 export const L = {
   // Navigation
   nav: {
-    dashboard: 'Tổng quan',
+    dashboard: 'Trang chủ',
+    spending: 'Phân tích',
     transactions: 'Giao dịch',
     settings: 'Cài đặt',
   },
 
   // Dashboard
   dashboard: {
-    title: 'Tổng quan',
-    balanceLabel: 'Số dư',
-    balanceToday: 'Số dư hôm nay',
-    balanceWeek: 'Số dư tuần này',
-    balanceMonth: 'Số dư tháng này',
-    income: 'Thu nhập',
-    expense: 'Chi tiêu',
+    title: 'Trang chủ',
     filterToday: 'Hôm nay',
     filterWeek: 'Tuần này',
     filterMonth: 'Tháng này',
-    chartDaily: 'Chi tiêu theo ngày',
     chartCategory: 'Chi tiêu theo danh mục',
     recentTitle: 'Giao dịch gần đây',
-    recentViewAll: 'Xem tất cả →',
+    recentViewAll: 'Xem tất cả',
     emptyTransactions: 'Chưa có giao dịch',
     emptyTransactionsHint: 'Gửi tin nhắn Telegram để thêm',
     emptyChart: 'Chưa có dữ liệu chi tiêu',
     emptyChartHint: 'Thêm giao dịch để xem biểu đồ',
     emptyChartSparse: 'Cần thêm dữ liệu để xem xu hướng',
     totalSpending: 'Tổng chi',
+    income: 'Thu nhập',
+    expense: 'Chi tiêu',
+  },
+
+  // Spending hero
+  spending: {
+    todayTitle: 'Đã chi hôm nay',
+    weekTitle: 'Đã chi tuần này',
+    monthTitle: 'Đã chi tháng này',
+    vsLastPeriod: (pct: number) => {
+      if (pct === 0) return 'Bằng kỳ trước';
+      return pct > 0
+        ? `Tăng ${pct}% so với kỳ trước`
+        : `Giảm ${Math.abs(pct)}% so với kỳ trước`;
+    },
+    noComparison: 'Chưa có dữ liệu kỳ trước',
+  },
+
+  // Daily allowance
+  allowance: {
+    title: 'Hạn mức hôm nay',
+    perDay: '/ngày',
+    safe: 'Bạn đang chi tiêu an toàn',
+    onTrack: 'Đang đi đúng kế hoạch',
+    overPace: 'Chi tiêu đang vượt kế hoạch',
+    noBudget: 'Đặt ngân sách để xem hạn mức',
+    daysLeft: (n: number) => `còn ${n} ngày`,
+    avgDaily: 'TB ngày',
+  },
+
+  // Savings
+  savings: {
+    title: 'Tiết kiệm',
+    goalLabel: 'Mục tiêu',
+    progress: 'Tiến độ',
+    achieved: (surplus: string) => `Tuyệt vời! Vượt mục tiêu ${surplus}`,
+    nearGoal: (remaining: string) => `Chỉ còn ${remaining} nữa!`,
+    inProgress: (remaining: string) => `Còn ${remaining} để đạt mục tiêu`,
+    noGoal: 'Đặt mục tiêu tiết kiệm',
+    goToSettings: 'Cài đặt',
+  },
+
+  // Budget
+  budget: {
+    label: 'Ngân sách',
+    title: 'Ngân sách tháng',
+    remaining: 'Còn lại',
+    used: 'Đã chi',
+    emptyTitle: 'Chưa đặt ngân sách',
+    emptyAction: 'Đặt ngay',
+    overBudget: (amount: string) => `Vượt ngân sách ${amount}`,
+    nearLimit: (amount: string) => `Chỉ còn ${amount} nữa thôi`,
+    onTrack: (daily: string) => `Đang đúng kế hoạch · ≈ ${daily}/ngày`,
+    offTrack: (daily: string) => `Chi tiêu nhanh hơn dự kiến · ≈ ${daily}/ngày`,
+  },
+
+  // Spending insights
+  insights: {
+    spendingLow: 'Chi tiêu hôm nay rất tốt',
+    spendingNormal: 'Bạn đang đi đúng kế hoạch',
+    spendingHigh: 'Chi tiêu tăng nhẹ, hãy cân nhắc',
+    weekendSpike: 'Chi tiêu tăng nhẹ cuối tuần',
+    savingEfficient: 'Bạn đang tiết kiệm hiệu quả',
+    willMeetGoal: 'Nếu giữ tốc độ này, bạn sẽ đạt mục tiêu',
+    betterThanLastMonth: 'Bạn đã tiết kiệm tốt hơn tháng trước',
   },
 
   analytics: {
+    title: 'Phân tích chi tiêu',
+    overview: 'Tổng quan',
+    trend: 'Xu hướng',
+    categories: 'Danh mục',
+    topCategories: 'Chi tiêu nhiều nhất',
+    avgDailySpending: 'TB chi/ngày',
+    totalTransactions: 'Giao dịch',
     transactions: (count: number) => `${count} giao dịch`,
-    categoryShare: (percentage: number) => `${percentage}% tổng danh mục`,
+    categoryShare: (percentage: number) => `${percentage}% tổng chi tiêu`,
     transactionCount: 'Số giao dịch',
     average: 'Trung bình',
     largest: 'Lớn nhất',
@@ -90,19 +156,7 @@ export const L = {
     sepayHint: 'Cấu hình webhook URL trong SePay dashboard:',
   },
 
-  // Budget
-  budget: {
-    label: 'Ngân sách',
-    remaining: 'Còn lại',
-    emptyTitle: 'Chưa đặt mục tiêu ngân sách',
-    emptyAction: 'Đặt ngay →',
-    overBudget: (amount: string) => `Vượt ngân sách ${amount}`,
-    nearLimit: (amount: string) => `Chỉ còn ${amount} nữa thôi`,
-    onTrack: (daily: string) => `Đang chi tiêu đúng kế hoạch · ≈ ${daily}/ngày`,
-    offTrack: (daily: string) => `Chi tiêu nhanh hơn dự kiến · ≈ ${daily}/ngày`,
-  },
-
-  // Saving
+  // Saving goal (settings)
   savingGoal: {
     achieved: (surplus: string) => `Tuyệt vời! Vượt mục tiêu ${surplus}`,
     nearGoal: (remaining: string) => `Chỉ còn ${remaining} nữa thôi`,

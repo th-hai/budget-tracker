@@ -21,6 +21,14 @@ export default async function handler(
 
   await connectDB();
 
+  // SePay sends transactionDate in VN time (UTC+7), e.g. "2026-05-10 21:14:00"
+  // Parse as VN time and convert to proper UTC
+  function parseVNDate(dateStr: string): Date {
+    // Append +07:00 so Date parses it as VN timezone
+    const isoish = dateStr.replace(' ', 'T');
+    return new Date(isoish + '+07:00');
+  }
+
   const payload = req.body;
   const {
     id: sepayId,
@@ -51,7 +59,7 @@ export default async function handler(
   const pending = await PendingTransaction.create({
     sepayId,
     gateway,
-    transactionDate: new Date(transactionDate),
+    transactionDate: parseVNDate(transactionDate),
     accountNumber,
     referenceCode,
     content,
@@ -81,7 +89,7 @@ export default async function handler(
         content,
         description,
       },
-      transactionDate: new Date(transactionDate),
+      transactionDate: parseVNDate(transactionDate),
       categorized: true,
     });
 
@@ -112,7 +120,7 @@ export default async function handler(
         content,
         description,
       },
-      transactionDate: new Date(transactionDate),
+      transactionDate: parseVNDate(transactionDate),
       categorized: false,
     });
 

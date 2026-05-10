@@ -66,7 +66,43 @@ export default async function handler(
   // Exclude saving from totals/daily (not real spending), but include in category breakdown (pie chart)
   const noSavingFilter = { ...dateFilter, category: { $ne: 'saving' } };
 
-  const [totals, categoryBreakdown, dailySpending, budgetGoal, savingTotal] =
+  // Calculate previous period for comparison
+  function getPrevPeriod(r: string, m: number, y: number) {
+    if (r === 'today') {
+      const vn = nowVN();
+      const vY = vn.getUTCFullYear(), vM = vn.getUTCMonth(), vD = vn.getUTCDate();
+      return {
+        start: vnMidnightUTC(vY, vM, vD - 1),
+        end: new Date(vnMidnightUTC(vY, vM, vD).getTime() - 1),
+      };
+    }
+    if (r === 'week') {
+      const vn = nowVN();
+      const vD = vn.getUTCDate();
+      const day = vn.getUTCDay();
+      const mondayD = vD - ((day + 6) % 7);
+      return {
+        start: vnMidnightUTC(vn.getUTCFullYear(), vn.getUTCMonth(), mondayD - 7),
+        end: new Date(vnMidnightUTC(vn.getUTCFullYear(), vn.getUTCMonth(), mondayD).getTime() - 1),
+      };
+    }
+    // Previous month
+    const pm = m === 1 ? 12 : m - 1;
+    const py = m === 1 ? y - 1 : y;
+    return {
+      start: vnMidnightUTC(py, pm - 1, 1),
+      end: new Date(vnMidnightUTC(py, pm, 1).getTime() - 1),
+    };
+  }
+
+  const prev = getPrevPeriod(range, month, year);
+  const prevFilter = {
+    transactionDate: { $gte: prev.start, $lte: prev.end },
+    categorized: true,
+    category: { $ne: 'saving' },
+  };
+
+  const [totals, categoryBreakdown, dailySpending, budgetGoal, savingTotal, prevTotals] =
     await Promise.all([
       Transaction.aggregate([
         { $match: noSavingFilter },
@@ -111,6 +147,11 @@ export default async function handler(
         { $match: { ...dateFilter, category: 'saving' } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
+      // Previous period totals for comparison
+      Transaction.aggregate([
+        { $match: prevFilter },
+        { $group: { _id: '$type', total: { $sum: '$amount' } } },
+      ]),
     ]);
 
   const totalIncome =
@@ -146,6 +187,24 @@ export default async function handler(
     .map(([date, values]) => ({ date, ...values }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  // Previous period comparison
+  const prevExpense = prevTotals.find((t: any) => t._id === 'expense')?.total || 0;
+  const spendingChange = prevExpense > 0
+    ? Math.round(((totalExpense - prevExpense) / prevExpense) * 100)
+    : null;
+
+  // Daily allowance: remaining budget / remaining days
+  const budget = budgetGoal?.totalBudget || 0;
+  const remaining = budget - totalExpense;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const vn = nowVN();
+  const dayOfMonth = vn.getUTCDate();
+  const daysLeft = Math.max(1, daysInMonth - dayOfMonth + 1);
+  const dailyAllowance = budget > 0 ? Math.round(Math.max(0, remaining) / daysLeft) : 0;
+
+  // Average daily spending so far this month
+  const avgDailySpending = dayOfMonth > 0 ? Math.round(totalExpense / dayOfMonth) : 0;
+
   return res.json({
     month,
     year,
@@ -153,13 +212,18 @@ export default async function handler(
     totalIncome,
     totalExpense,
     balance: totalIncome - totalExpense,
-    budgetGoal: budgetGoal?.totalBudget || null,
-    budgetRemaining: budgetGoal
-      ? budgetGoal.totalBudget - totalExpense
-      : null,
+    budgetGoal: budget || null,
+    budgetRemaining: budget ? remaining : null,
     savingGoal: budgetGoal?.savingGoal || null,
     actualSaving: savingTotal[0]?.total || 0,
     categoryBreakdown: categories,
     dailySpending: daily,
+    // New spending behavior fields
+    spendingChange,
+    prevExpense,
+    dailyAllowance,
+    avgDailySpending,
+    daysLeft,
+    daysInMonth,
   });
 }
