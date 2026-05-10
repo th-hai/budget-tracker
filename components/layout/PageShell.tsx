@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import BottomNav from './BottomNav';
+import TabBar from '@/components/ui/TabBar';
 
 interface PageShellProps {
   children: ReactNode;
@@ -8,14 +8,14 @@ interface PageShellProps {
 
 export default function PageShell({ children, title }: PageShellProps) {
   return (
-    <div className="min-h-screen bg-cream pb-24">
-      <div className="max-w-lg mx-auto px-4 pt-8">
+    <div className="min-h-screen bg-[color:var(--app-bg)] pb-24 text-[color:var(--text-primary)] transition-colors duration-200">
+      <div className="mx-auto max-w-lg px-4 pt-8">
         {title && (
           <h1 className="text-xl font-bold mb-6">{title}</h1>
         )}
         {children}
       </div>
-      <BottomNav />
+      <TabBar />
     </div>
   );
 }

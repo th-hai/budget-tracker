@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import TransactionCard from './TransactionCard';
 import { formatDateSmart, formatVNDShort } from '@/lib/format';
+import Card from '@/components/ui/Card';
+import { L } from '@/lib/labels';
 
 interface Transaction {
   _id: string;
@@ -32,8 +34,8 @@ export default function TransactionList({ transactions, onSelect }: TransactionL
     return (
       <div className="text-center py-14">
         <p className="text-3xl opacity-15 mb-3">📋</p>
-        <p className="text-sm font-semibold opacity-30">Chưa có giao dịch nào</p>
-        <p className="text-xs font-medium opacity-20 mt-1">Gửi tin nhắn Telegram để thêm</p>
+        <p className="text-sm font-semibold opacity-30">{L.transactions.emptyList}</p>
+        <p className="text-xs font-medium opacity-20 mt-1">{L.transactions.emptyListHint}</p>
       </div>
     );
   }
@@ -49,21 +51,21 @@ export default function TransactionList({ transactions, onSelect }: TransactionL
         return (
           <div key={date}>
             <div className="flex justify-between items-baseline mb-1.5 px-1">
-              <h3 className="text-[11px] font-bold opacity-35">
+              <h3 className="text-[11px] font-bold text-[color:var(--text-muted)]">
                 {formatDateSmart(date)}
               </h3>
-              <span className={`text-[11px] font-bold ${dayTotal >= 0 ? 'opacity-25' : 'text-coral/50'}`}>
-                {dayTotal >= 0 ? '+' : ''}{formatVNDShort(Math.abs(dayTotal))}
+              <span className={`text-[11px] font-bold ${dayTotal >= 0 ? 'text-teal' : 'text-coral'}`}>
+                {dayTotal >= 0 ? '+' : '-'}{formatVNDShort(Math.abs(dayTotal))}
               </span>
             </div>
-            <div className="card-brutal p-1.5">
+            <Card density="compact" className="p-1.5">
               {txs.map((tx, i) => (
                 <div key={tx._id}>
-                  {i > 0 && <div className="border-t border-nero/5 mx-2" />}
+                  {i > 0 && <div className="border-t border-nero/5 mx-2 dark:border-white/8" />}
                   <TransactionCard transaction={tx} onClick={() => onSelect?.(tx)} />
                 </div>
               ))}
-            </div>
+            </Card>
           </div>
         );
       })}

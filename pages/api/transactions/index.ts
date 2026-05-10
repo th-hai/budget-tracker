@@ -25,16 +25,24 @@ export default async function handler(
     const filter: any = {};
     const noteConditions: any[] = [];
 
+    // Vietnam timezone: UTC+7
+    const VN_MS = 7 * 60 * 60 * 1000;
+    function vnMid(y: number, m: number, d: number) { return new Date(Date.UTC(y, m, d) - VN_MS); }
+
     // Date range: prefer startDate/endDate, fall back to month/year
     if (startDate && endDate) {
+      const [sy, sm, sd] = (startDate as string).split('-').map(Number);
+      const [ey, em, ed] = (endDate as string).split('-').map(Number);
       filter.transactionDate = {
-        $gte: new Date(startDate as string),
-        $lte: new Date(new Date(endDate as string).setHours(23, 59, 59, 999)),
+        $gte: vnMid(sy, sm - 1, sd),
+        $lte: new Date(vnMid(ey, em - 1, ed + 1).getTime() - 1),
       };
     } else if (month && year) {
-      const start = new Date(Number(year), Number(month) - 1, 1);
-      const end = new Date(Number(year), Number(month), 0, 23, 59, 59, 999);
-      filter.transactionDate = { $gte: start, $lte: end };
+      const m = Number(month), y = Number(year);
+      filter.transactionDate = {
+        $gte: vnMid(y, m - 1, 1),
+        $lte: new Date(vnMid(y, m, 1).getTime() - 1),
+      };
     }
 
     if (category) filter.category = category;

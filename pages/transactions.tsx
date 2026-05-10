@@ -5,6 +5,8 @@ import PageShell from '@/components/layout/PageShell';
 import TransactionList from '@/components/transaction/TransactionList';
 import TransactionDetail from '@/components/transaction/TransactionDetail';
 import DateRangePicker from '@/components/ui/DateRangePicker';
+import Segmented from '@/components/ui/Segmented';
+import Chip from '@/components/ui/Chip';
 import { EXPENSE_CATEGORIES } from '@/lib/categories';
 import { L } from '@/lib/labels';
 
@@ -78,12 +80,11 @@ export default function TransactionsPage() {
   return (
     <PageShell>
       {/* Month selector / date range display */}
-      <div className="flex items-center justify-center gap-4 mb-4">
+      <div className="mb-4 flex items-center justify-center gap-4">
         {!hasDateRange && (
           <button
             onClick={() => handleMonthChange(-1)}
-            className="w-9 h-9 rounded-xl bg-white border border-nero/10 flex items-center justify-center text-base font-bold text-nero/40 hover:text-nero/70 transition-colors"
-            style={{ boxShadow: '0 1px 3px rgba(26,26,26,0.06)' }}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-nero/10 bg-white text-base font-bold text-nero/40 transition-colors hover:text-nero/70 dark:border-white/10 dark:bg-white/5 dark:text-cream/50"
           >
             ‹
           </button>
@@ -94,8 +95,7 @@ export default function TransactionsPage() {
         {!hasDateRange && (
           <button
             onClick={() => handleMonthChange(1)}
-            className="w-9 h-9 rounded-xl bg-white border border-nero/10 flex items-center justify-center text-base font-bold text-nero/40 hover:text-nero/70 transition-colors"
-            style={{ boxShadow: '0 1px 3px rgba(26,26,26,0.06)' }}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-nero/10 bg-white text-base font-bold text-nero/40 transition-colors hover:text-nero/70 dark:border-white/10 dark:bg-white/5 dark:text-cream/50"
           >
             ›
           </button>
@@ -103,7 +103,7 @@ export default function TransactionsPage() {
       </div>
 
       {/* Date range button */}
-      <div className="flex justify-center mb-3">
+      <div className="mb-3 flex justify-center">
         <button
           onClick={() => setDatePickerOpen(true)}
           className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 flex items-center gap-1.5 ${
@@ -130,22 +130,15 @@ export default function TransactionsPage() {
         </button>
       </div>
 
-      {/* Type filter — segmented control */}
-      <div className="flex gap-1.5 bg-nero/5 p-1 rounded-xl mb-3">
-        {TYPE_FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => { setType(f.key); setPage(1); }}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${
-              type === f.key
-                ? 'bg-white text-nero shadow-sm'
-                : 'text-nero/40 hover:text-nero/60'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        options={TYPE_FILTERS}
+        value={type}
+        onChange={(value) => {
+          setType(value);
+          setPage(1);
+        }}
+        className="mb-3"
+      />
 
       {/* Search */}
       <div className="relative mb-3">
@@ -156,7 +149,7 @@ export default function TransactionsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={L.transactions.searchPlaceholder}
-          className="w-full rounded-2xl border border-nero/10 bg-white py-3 pl-10 pr-11 text-sm font-semibold outline-none transition-all duration-150 placeholder:text-nero/25 focus:border-teal focus:shadow-[0_0_0_3px_rgba(78,205,196,0.14)]"
+          className="w-full rounded-2xl border border-nero/10 bg-white py-3 pl-10 pr-11 text-sm font-semibold outline-none transition-all duration-150 placeholder:text-nero/25 focus:border-teal focus:shadow-[0_0_0_3px_rgba(78,205,196,0.14)] dark:border-white/10 dark:bg-white/5 dark:text-cream dark:placeholder:text-cream/25"
         />
         {search && (
           <button
@@ -175,47 +168,34 @@ export default function TransactionsPage() {
       </div>
 
       {/* Category filter */}
-      <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
-        <button
+      <div className="scrollbar-none mb-3 flex snap-x gap-1.5 overflow-x-auto pb-1">
+        <Chip
           onClick={() => { setCategory(''); setPage(1); }}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-150 ${
-            category === ''
-              ? 'bg-yolk text-nero shadow-sm'
-              : 'bg-nero/5 text-nero/40 hover:bg-nero/10'
-          }`}
+          active={category === ''}
         >
           {L.transactions.filterAll}
-        </button>
+        </Chip>
         {EXPENSE_CATEGORIES.map((cat) => (
-          <button
+          <Chip
             key={cat.key}
             onClick={() => { setCategory(cat.key); setPage(1); }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-150 ${
-              category === cat.key
-                ? 'text-nero shadow-sm'
-                : 'bg-nero/5 text-nero/40 hover:bg-nero/10'
-            }`}
-            style={category === cat.key ? { backgroundColor: cat.color } : undefined}
+            active={category === cat.key}
           >
             {cat.icon} {cat.label}
-          </button>
+          </Chip>
         ))}
       </div>
 
       {/* Wallet filter */}
-      <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1">
+      <div className="scrollbar-none mb-5 flex snap-x gap-1.5 overflow-x-auto pb-1">
         {L.wallets.map((w) => (
-          <button
+          <Chip
             key={w.key}
             onClick={() => { setWallet(w.key); setPage(1); }}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all duration-150 flex items-center gap-1 ${
-              wallet === w.key
-                ? 'bg-lilac/20 text-nero shadow-sm'
-                : 'bg-nero/5 text-nero/40 hover:bg-nero/10'
-            }`}
+            active={wallet === w.key}
           >
             <span>{w.icon}</span> {w.label}
-          </button>
+          </Chip>
         ))}
       </div>
 
@@ -245,8 +225,7 @@ export default function TransactionsPage() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-4 py-2 rounded-xl text-sm font-bold bg-white border border-nero/10 text-nero/50 hover:text-nero/70 disabled:opacity-30 transition-all"
-                style={{ boxShadow: '0 1px 3px rgba(26,26,26,0.06)' }}
+                className="rounded-xl border border-nero/10 bg-white px-4 py-2 text-sm font-bold text-nero/50 transition-all hover:text-nero/70 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-cream/50"
               >
                 {L.transactions.prevPage}
               </button>
@@ -254,8 +233,7 @@ export default function TransactionsPage() {
               <button
                 onClick={() => setPage((p) => Math.min(data.pagination.totalPages, p + 1))}
                 disabled={page === data.pagination.totalPages}
-                className="px-4 py-2 rounded-xl text-sm font-bold bg-white border border-nero/10 text-nero/50 hover:text-nero/70 disabled:opacity-30 transition-all"
-                style={{ boxShadow: '0 1px 3px rgba(26,26,26,0.06)' }}
+                className="rounded-xl border border-nero/10 bg-white px-4 py-2 text-sm font-bold text-nero/50 transition-all hover:text-nero/70 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-cream/50"
               >
                 {L.transactions.nextPage}
               </button>

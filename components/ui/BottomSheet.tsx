@@ -74,9 +74,10 @@ export default function BottomSheet({ open, onClose, children, zIndex = 60 }: Bo
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl max-h-[85vh] overflow-y-auto transition-transform duration-300 ease-out"
+        className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-white text-nero transition-transform duration-300 ease-out dark:bg-d-card dark:text-cream"
         style={{
           transform: animating ? 'translateY(0)' : 'translateY(100%)',
+          transitionTimingFunction: 'cubic-bezier(0.32, 0.72, 0, 1)',
           boxShadow: '0 -4px 20px rgba(0,0,0,0.08)',
         }}
         onTouchStart={handleTouchStart}
@@ -85,7 +86,7 @@ export default function BottomSheet({ open, onClose, children, zIndex = 60 }: Bo
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 rounded-full bg-nero/15" />
+          <div className="h-1 w-10 rounded-full bg-nero/15 dark:bg-white/15" />
         </div>
         <div className="px-5 pb-8">
           {children}

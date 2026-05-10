@@ -16,10 +16,11 @@ export default async function handler(
 
   await connectDB();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  // Vietnam midnight in UTC (UTC+7)
+  const VN_MS = 7 * 60 * 60 * 1000;
+  const vn = new Date(Date.now() + VN_MS);
+  const today = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - VN_MS);
+  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
   // Find uncategorized transactions from today
   const uncategorized = await Transaction.find({

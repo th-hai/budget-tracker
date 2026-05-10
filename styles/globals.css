@@ -5,9 +5,24 @@
 @tailwind utilities;
 
 @layer base {
+  html,
   body {
-    @apply bg-cream text-nero font-sans antialiased;
+    background: #FFFDF7;
+    color: #1a1a1a;
+  }
+
+  html.dark,
+  html.dark body {
+    background: #13110C;
+    color: #F6F1E1;
+  }
+
+  * {
     font-variant-numeric: tabular-nums;
+  }
+
+  body {
+    @apply font-sans antialiased;
     -webkit-tap-highlight-color: transparent;
   }
 }
@@ -35,12 +50,18 @@
   }
 
   .card-brutal {
-    @apply border border-nero/10 rounded-2xl bg-white;
-    box-shadow: 0 1px 3px rgba(26, 26, 26, 0.06), 0 4px 12px rgba(26, 26, 26, 0.04);
+    background: var(--surface-card);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    color: var(--text-primary);
+    box-shadow: var(--card-shadow);
   }
 
   .input-brutal {
-    @apply border-2 border-nero/15 rounded-xl px-3 py-2 text-sm font-semibold bg-cream outline-none font-sans w-full transition-all duration-150;
+    @apply rounded-xl px-3 py-2 text-sm font-semibold outline-none font-sans w-full transition-all duration-150;
+    background: var(--surface-soft);
+    border: 1px solid var(--border-soft);
+    color: var(--text-primary);
     box-shadow: 0 1px 2px rgba(26, 26, 26, 0.04);
   }
 
@@ -48,6 +69,66 @@
     box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.15);
     border-color: #4ECDC4;
   }
+}
+
+:root {
+  --app-bg: #FFFDF7;
+  --surface-card: #FFFFFF;
+  --surface-soft: rgba(26, 26, 26, 0.04);
+  --text-primary: #1a1a1a;
+  --text-muted: rgba(26, 26, 26, 0.52);
+  --border-soft: rgba(26, 26, 26, 0.10);
+  --card-border: 1px solid rgba(26, 26, 26, 0.10);
+  --card-radius: 1rem;
+  --card-shadow: 0 1px 0 rgba(26,26,26,0.04), 0 8px 24px -12px rgba(26,26,26,0.10);
+  --accent: #4ECDC4;
+  --accent-ink: #1a1a1a;
+  --track: #DDDBD6;
+  --chart-muted: rgba(26, 26, 26, 0.18);
+}
+
+.dark {
+  --app-bg: #13110C;
+  --surface-card: #1F1B12;
+  --surface-soft: rgba(255, 255, 255, 0.06);
+  --text-primary: #F6F1E1;
+  --text-muted: rgba(246, 241, 225, 0.58);
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --card-border: 1px solid rgba(255, 255, 255, 0.06);
+  --card-shadow: 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px -12px rgba(0,0,0,0.5);
+  --track: rgba(255, 255, 255, 0.07);
+  --chart-muted: rgba(255, 255, 255, 0.22);
+}
+
+.theme-playful {
+  --app-bg: #FFF6E5;
+  --surface-card: #FFFDF7;
+  --surface-soft: #FFF6E5;
+  --text-primary: #2D2517;
+  --text-muted: rgba(45, 37, 23, 0.62);
+  --border-soft: rgba(45, 37, 23, 0.14);
+  --card-border: 2px solid #2D2517;
+  --card-radius: 1.4rem;
+  --card-shadow: 0 3px 0 rgba(45,37,23,0.15);
+}
+
+.dark.theme-playful {
+  --app-bg: #1B1812;
+  --surface-card: #2A251A;
+  --surface-soft: rgba(255, 246, 229, 0.06);
+  --text-primary: #FFF6E5;
+  --text-muted: rgba(255, 246, 229, 0.60);
+  --border-soft: rgba(255, 246, 229, 0.10);
+  --card-border: 1px solid rgba(255, 246, 229, 0.08);
+  --card-shadow: 0 2px 0 rgba(0,0,0,0.3), 0 12px 28px rgba(0,0,0,0.35);
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
 @layer utilities {

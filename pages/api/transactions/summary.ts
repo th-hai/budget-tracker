@@ -3,29 +3,41 @@ import connectDB from '@/lib/mongodb';
 import Transaction from '@/models/Transaction';
 import BudgetGoal from '@/models/BudgetGoal';
 
-function getDateRange(range: string, month: number, year: number) {
+// Vietnam timezone offset: UTC+7
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+// Get current time in Vietnam
+function nowVN() {
   const now = new Date();
+  return new Date(now.getTime() + VN_OFFSET_MS);
+}
+
+// Create a UTC date that corresponds to midnight VN time on a given VN date
+function vnMidnightUTC(y: number, m: number, d: number) {
+  return new Date(Date.UTC(y, m, d) - VN_OFFSET_MS);
+}
+
+function getDateRange(range: string, month: number, year: number) {
+  const vn = nowVN();
+  const vY = vn.getUTCFullYear(), vM = vn.getUTCMonth(), vD = vn.getUTCDate();
 
   if (range === 'today') {
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    end.setMilliseconds(-1);
+    const start = vnMidnightUTC(vY, vM, vD);
+    const end = new Date(vnMidnightUTC(vY, vM, vD + 1).getTime() - 1);
     return { start, end };
   }
 
   if (range === 'week') {
-    const day = now.getDay(); // 0=Sun
-    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((day + 6) % 7));
-    const sunday = new Date(monday);
-    sunday.setDate(sunday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-    return { start: monday, end: sunday };
+    const day = vn.getUTCDay(); // 0=Sun
+    const mondayD = vD - ((day + 6) % 7);
+    const start = vnMidnightUTC(vY, vM, mondayD);
+    const end = new Date(vnMidnightUTC(vY, vM, mondayD + 7).getTime() - 1);
+    return { start, end };
   }
 
   // Default: month
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0, 23, 59, 59, 999);
+  const start = vnMidnightUTC(year, month - 1, 1);
+  const end = new Date(vnMidnightUTC(year, month, 1).getTime() - 1);
   return { start, end };
 }
 
