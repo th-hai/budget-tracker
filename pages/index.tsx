@@ -6,6 +6,7 @@ import PageShell from '@/components/layout/PageShell';
 import Card from '@/components/ui/Card';
 import BudgetProgressCard from '@/components/charts/BudgetProgressCard';
 import CategoryPieChart from '@/components/charts/CategoryPieChart';
+import CategoryDrilldownSheet from '@/components/charts/CategoryDrilldownSheet';
 import SpendingLineChart from '@/components/charts/SpendingLineChart';
 import TransactionCard from '@/components/transaction/TransactionCard';
 import TransactionDetail from '@/components/transaction/TransactionDetail';
@@ -38,21 +39,83 @@ function getRangeLabel(range: string) {
   return L.dashboard.balanceMonth.replace('Số dư ', '');
 }
 
+function pad(n: number) {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function toDateInputValue(date: Date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function getClientDateRange(range: string, month: number, year: number) {
+  const now = new Date();
+
+  if (range === 'today') {
+    return { startDate: toDateInputValue(now), endDate: toDateInputValue(now) };
+  }
+
+  if (range === 'week') {
+    const day = now.getDay();
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((day + 6) % 7));
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+    return { startDate: toDateInputValue(monday), endDate: toDateInputValue(sunday) };
+  }
+
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+  return { startDate: toDateInputValue(start), endDate: toDateInputValue(end) };
+}
+
 export default function Dashboard() {
   const now = new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
   const [range, setRange] = useState('month');
   const [selectedTx, setSelectedTx] = useState<any>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const { data: summary, isLoading: summaryLoading } = useSWR(
+  const { data: summary, isLoading: summaryLoading, mutate: mutateSummary } = useSWR(
     `/api/transactions/summary?month=${month}&year=${year}&range=${range}`,
     fetcher,
     { refreshInterval: 30000 }
   );
 
-  const { data: recent } = useSWR(
+  const { data: recent, mutate: mutateRecent } = useSWR(
     `/api/transactions?limit=5&month=${month}&year=${year}`,
+    fetcher,
+    { refreshInterval: 30000 }
+  );
+
+  const categoryBreakdownTotal = (summary?.categoryBreakdown || []).reduce(
+    (sum: number, item: any) => sum + item.total,
+    0
+  );
+  const selectedCategorySummaryRaw = summary?.categoryBreakdown?.find(
+    (item: any) => item.category === selectedCategory
+  );
+  const selectedCategorySummary = selectedCategorySummaryRaw
+    ? {
+      ...selectedCategorySummaryRaw,
+      percentage: categoryBreakdownTotal > 0
+        ? Math.round((selectedCategorySummaryRaw.total / categoryBreakdownTotal) * 100)
+        : 0,
+    }
+    : undefined;
+  const selectedRange = getClientDateRange(range, month, year);
+  const categoryTxParams = new URLSearchParams({
+    limit: '100',
+    category: selectedCategory || '',
+    type: 'expense',
+    startDate: selectedRange.startDate,
+    endDate: selectedRange.endDate,
+  });
+  const {
+    data: categoryTransactions,
+    isLoading: categoryTransactionsLoading,
+    mutate: mutateCategoryTransactions,
+  } = useSWR(
+    selectedCategory ? `/api/transactions?${categoryTxParams}` : null,
     fetcher,
     { refreshInterval: 30000 }
   );
@@ -148,7 +211,11 @@ export default function Dashboard() {
           {/* Category breakdown */}
           <Card>
             <h2 className="text-sm font-bold mb-4">{L.dashboard.chartCategory}</h2>
-            <CategoryPieChart data={summary.categoryBreakdown || []} />
+            <CategoryPieChart
+              data={summary.categoryBreakdown || []}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+            />
           </Card>
 
           {/* Recent transactions */}
@@ -197,6 +264,29 @@ export default function Dashboard() {
       <TransactionDetail
         transaction={selectedTx}
         onClose={() => setSelectedTx(null)}
+        onUpdated={(tx) => {
+          setSelectedTx(tx);
+          mutateSummary();
+          mutateRecent();
+          mutateCategoryTransactions();
+        }}
+        onDeleted={() => {
+          setSelectedTx(null);
+          mutateSummary();
+          mutateRecent();
+          mutateCategoryTransactions();
+        }}
+        zIndex={70}
+      />
+
+      <CategoryDrilldownSheet
+        open={!!selectedCategory}
+        categoryKey={selectedCategory}
+        summary={selectedCategorySummary}
+        transactions={categoryTransactions?.data || []}
+        loading={categoryTransactionsLoading}
+        onClose={() => setSelectedCategory(null)}
+        onSelectTransaction={setSelectedTx}
       />
     </PageShell>
   );

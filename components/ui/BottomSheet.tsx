@@ -4,9 +4,10 @@ interface BottomSheetProps {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  zIndex?: number;
 }
 
-export default function BottomSheet({ open, onClose, children }: BottomSheetProps) {
+export default function BottomSheet({ open, onClose, children, zIndex = 60 }: BottomSheetProps) {
   const [visible, setVisible] = useState(false);
   const [animating, setAnimating] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -60,7 +61,7 @@ export default function BottomSheet({ open, onClose, children }: BottomSheetProp
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[60]">
+    <div className="fixed inset-0" style={{ zIndex }}>
       {/* Backdrop */}
       <div
         className="absolute inset-0 transition-opacity duration-300"

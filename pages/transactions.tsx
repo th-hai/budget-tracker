@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import fetcher from '@/lib/api';
 import PageShell from '@/components/layout/PageShell';
@@ -28,8 +28,18 @@ export default function TransactionsPage() {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const hasDateRange = !!startDate && !!endDate;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   const params = new URLSearchParams({
     page: String(page), limit: '20',
@@ -44,8 +54,9 @@ export default function TransactionsPage() {
   if (category) params.set('category', category);
   if (type) params.set('type', type);
   if (wallet) params.set('wallet', wallet);
+  if (debouncedSearch) params.set('search', debouncedSearch);
 
-  const { data, isLoading } = useSWR(`/api/transactions?${params}`, fetcher, { refreshInterval: 30000 });
+  const { data, isLoading, mutate } = useSWR(`/api/transactions?${params}`, fetcher, { refreshInterval: 30000 });
 
   const handleMonthChange = (delta: number) => {
     if (hasDateRange) return;
@@ -134,6 +145,33 @@ export default function TransactionsPage() {
             {f.label}
           </button>
         ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-3">
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm opacity-35 pointer-events-none">
+          🔎
+        </span>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={L.transactions.searchPlaceholder}
+          className="w-full rounded-2xl border border-nero/10 bg-white py-3 pl-10 pr-11 text-sm font-semibold outline-none transition-all duration-150 placeholder:text-nero/25 focus:border-teal focus:shadow-[0_0_0_3px_rgba(78,205,196,0.14)]"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('');
+              setDebouncedSearch('');
+              setPage(1);
+            }}
+            aria-label={L.transactions.searchClear}
+            className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-nero/5 text-sm font-bold text-nero/35 transition-all duration-150 hover:bg-nero/10 active:scale-[0.96]"
+          >
+            ×
+          </button>
+        )}
       </div>
 
       {/* Category filter */}
@@ -229,6 +267,14 @@ export default function TransactionsPage() {
       <TransactionDetail
         transaction={selectedTx}
         onClose={() => setSelectedTx(null)}
+        onUpdated={(tx) => {
+          setSelectedTx(tx);
+          mutate();
+        }}
+        onDeleted={() => {
+          setSelectedTx(null);
+          mutate();
+        }}
       />
 
       <DateRangePicker

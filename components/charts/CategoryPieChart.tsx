@@ -2,41 +2,13 @@ import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
 import { getCategoryByKey } from '@/lib/categories';
 import { formatVNDShort } from '@/lib/format';
+import { L } from '@/lib/labels';
 
 interface CategoryData {
   category: string;
   total: number;
   percentage: number;
-}
-
-const SMALL_THRESHOLD = 3; // merge categories below 3% into "Khac"
-
-function mergeSmallCategories(data: CategoryData[]): CategoryData[] {
-  const main: CategoryData[] = [];
-  let otherTotal = 0;
-  let otherPct = 0;
-
-  data.forEach((d) => {
-    if (d.percentage < SMALL_THRESHOLD && d.category !== 'saving') {
-      otherTotal += d.total;
-      otherPct += d.percentage;
-    } else {
-      main.push(d);
-    }
-  });
-
-  // Merge into existing "other" or create one
-  if (otherTotal > 0) {
-    const existingOther = main.find((d) => d.category === 'other');
-    if (existingOther) {
-      existingOther.total += otherTotal;
-      existingOther.percentage += otherPct;
-    } else {
-      main.push({ category: 'other', total: otherTotal, percentage: otherPct });
-    }
-  }
-
-  return main;
+  count?: number;
 }
 
 function ActiveShape(props: any) {
@@ -106,11 +78,19 @@ function BreakdownBar({ cat, total, percentage, maxPct, index }: {
   );
 }
 
-export default function CategoryPieChart({ data }: { data: CategoryData[] }) {
-  const [activeIndex, setActiveIndex] = useState(-1);
+export default function CategoryPieChart({
+  data,
+  selectedCategory,
+  onSelectCategory,
+}: {
+  data: CategoryData[];
+  selectedCategory?: string | null;
+  onSelectCategory?: (category: string) => void;
+}) {
+  const [hoverIndex, setHoverIndex] = useState(-1);
 
   if (data.length === 0) {
-    return <div className="text-center py-10 text-sm font-semibold opacity-30">Chưa có dữ liệu chi tiêu</div>;
+    return <div className="text-center py-10 text-sm font-semibold opacity-30">{L.dashboard.emptyChart}</div>;
   }
 
   // Recalculate percentages from actual totals (server-side % can be wrong when saving is excluded from totalExpense)
@@ -120,20 +100,26 @@ export default function CategoryPieChart({ data }: { data: CategoryData[] }) {
     percentage: totalAmount > 0 ? Math.round((d.total / totalAmount) * 100) : 0,
   }));
 
-  const merged = mergeSmallCategories(withPct);
+  const merged = withPct;
   const maxPct = Math.max(...merged.map((d) => d.percentage));
 
   const chartData = merged.map((d) => {
     const cat = getCategoryByKey(d.category);
     return {
+      category: d.category,
       name: cat?.label || d.category,
       value: d.total,
       color: cat?.color || '#B8BFC6',
       icon: cat?.icon || '📌',
       percentage: d.percentage,
+      count: d.count || 0,
     };
   });
 
+  const selectedIndex = selectedCategory
+    ? chartData.findIndex((d) => d.category === selectedCategory)
+    : -1;
+  const activeIndex = hoverIndex >= 0 ? hoverIndex : selectedIndex;
   const activeItem = activeIndex >= 0 ? chartData[activeIndex] : null;
 
   return (
@@ -154,9 +140,11 @@ export default function CategoryPieChart({ data }: { data: CategoryData[] }) {
               strokeWidth={2}
               activeIndex={activeIndex >= 0 ? activeIndex : undefined}
               activeShape={ActiveShape}
-              onMouseEnter={(_, index) => setActiveIndex(index)}
-              onMouseLeave={() => setActiveIndex(-1)}
-              onClick={(_, index) => setActiveIndex(activeIndex === index ? -1 : index)}
+              animationDuration={700}
+              animationEasing="ease-out"
+              onMouseEnter={(_, index) => setHoverIndex(index)}
+              onMouseLeave={() => setHoverIndex(-1)}
+              onClick={(_, index) => onSelectCategory?.(chartData[index].category)}
               style={{ cursor: 'pointer', outline: 'none' }}
             >
               {chartData.map((entry, index) => (
@@ -165,7 +153,8 @@ export default function CategoryPieChart({ data }: { data: CategoryData[] }) {
                   fill={entry.color}
                   style={{
                     opacity: activeIndex >= 0 && activeIndex !== index ? 0.4 : 1,
-                    transition: 'opacity 200ms ease',
+                    filter: activeIndex === index ? 'drop-shadow(0 4px 8px rgba(26,26,26,0.12))' : 'none',
+                    transition: 'opacity 220ms ease, filter 220ms ease',
                   }}
                 />
               ))}
@@ -178,12 +167,15 @@ export default function CategoryPieChart({ data }: { data: CategoryData[] }) {
           {activeItem ? (
             <>
               <span className="text-lg font-bold">{formatVNDShort(activeItem.value)}</span>
-              <span className="text-[11px] font-semibold opacity-40">{activeItem.icon} {activeItem.name}</span>
+              <span className="text-[11px] font-semibold opacity-40">
+                {activeItem.percentage}% · {L.analytics.transactions(activeItem.count)}
+              </span>
+              <span className="text-[10px] font-bold opacity-30">{activeItem.icon} {activeItem.name}</span>
             </>
           ) : (
             <>
               <span className="text-lg font-bold">{formatVNDShort(totalAmount)}</span>
-              <span className="text-[11px] font-semibold opacity-40">Tổng chi</span>
+              <span className="text-[11px] font-semibold opacity-40">{L.dashboard.totalSpending}</span>
             </>
           )}
         </div>
@@ -194,14 +186,22 @@ export default function CategoryPieChart({ data }: { data: CategoryData[] }) {
         {chartData.map((entry, i) => {
           const cat = { icon: entry.icon, label: entry.name, color: entry.color };
           return (
-            <BreakdownBar
+            <button
               key={i}
-              cat={cat}
-              total={entry.value}
-              percentage={entry.percentage}
-              maxPct={maxPct}
-              index={i}
-            />
+              type="button"
+              onClick={() => onSelectCategory?.(entry.category)}
+              className={`w-full rounded-xl px-2 transition-all duration-200 active:scale-[0.98] ${
+                selectedCategory === entry.category ? 'bg-nero/[0.03]' : 'hover:bg-nero/[0.02]'
+              }`}
+            >
+              <BreakdownBar
+                cat={cat}
+                total={entry.value}
+                percentage={entry.percentage}
+                maxPct={maxPct}
+                index={i}
+              />
+            </button>
           );
         })}
       </div>

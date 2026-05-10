@@ -19,9 +19,11 @@ export default async function handler(
       startDate,
       endDate,
       wallet,
+      search,
     } = req.query;
 
     const filter: any = {};
+    const noteConditions: any[] = [];
 
     // Date range: prefer startDate/endDate, fall back to month/year
     if (startDate && endDate) {
@@ -39,6 +41,11 @@ export default async function handler(
     if (type) filter.type = type;
     filter.categorized = true;
 
+    if (search && String(search).trim()) {
+      const escaped = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      noteConditions.push({ note: { $regex: escaped, $options: 'i' } });
+    }
+
     // Wallet filter: match note patterns for digital wallets
     if (wallet) {
       const walletPatterns: Record<string, RegExp> = {
@@ -49,8 +56,14 @@ export default async function handler(
       };
       const pattern = walletPatterns[wallet as string];
       if (pattern) {
-        filter.note = { $regex: pattern };
+        noteConditions.push({ note: { $regex: pattern } });
       }
+    }
+
+    if (noteConditions.length === 1) {
+      Object.assign(filter, noteConditions[0]);
+    } else if (noteConditions.length > 1) {
+      filter.$and = noteConditions;
     }
 
     const pageNum = Number(page);

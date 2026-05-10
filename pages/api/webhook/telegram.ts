@@ -46,37 +46,18 @@ async function handleTextMessage(message: any) {
 
   if (chatId !== process.env.TELEGRAM_CHAT_ID) return;
 
+  const directNoteMatch = text.match(/^#note_([a-f0-9]{24})\s+([\s\S]+)$/i);
+  if (directNoteMatch) {
+    await updateTransactionNote(directNoteMatch[1], directNoteMatch[2].trim());
+    return;
+  }
+
   // Handle reply to "edit note" message
   const replyTo = message.reply_to_message;
   if (replyTo?.text) {
-    const noteMatch = replyTo.text.match(/#note_([a-f0-9]{24})/);
+    const noteMatch = replyTo.text.match(/#note_([a-f0-9]{24})/i);
     if (noteMatch) {
-      const txId = noteMatch[1];
-      await connectDB();
-      const tx = await Transaction.findByIdAndUpdate(
-        txId,
-        { note: text },
-        { new: true }
-      );
-      if (tx) {
-        const amountK = Math.round(tx.amount / 1000);
-        const cat = getCategoryByKey(tx.category);
-        if (tx.categorized) {
-          const catLabel = cat ? `${cat.icon} ${cat.label}` : tx.category;
-          await sendMessage(L.telegram.noteUpdated(String(amountK), catLabel, text));
-        } else {
-          await sendMessage(
-            L.telegram.noteUpdatedAsk(String(amountK), text),
-            {
-              reply_markup: {
-                inline_keyboard: buildCategoryKeyboard(txId),
-              },
-            }
-          );
-        }
-      } else {
-        await sendMessage(L.telegram.txNotFound);
-      }
+      await updateTransactionNote(noteMatch[1], text);
       return;
     }
   }
@@ -193,6 +174,40 @@ async function handleTextMessage(message: any) {
   );
 }
 
+async function updateTransactionNote(txId: string, note: string) {
+  if (!note) return;
+
+  await connectDB();
+  const tx = await Transaction.findByIdAndUpdate(
+    txId,
+    { note },
+    { new: true }
+  );
+
+  if (!tx) {
+    await sendMessage(L.telegram.txNotFound);
+    return;
+  }
+
+  const amountK = Math.round(tx.amount / 1000);
+  const cat = getCategoryByKey(tx.category);
+
+  if (tx.categorized) {
+    const catLabel = cat ? `${cat.icon} ${cat.label}` : tx.category;
+    await sendMessage(L.telegram.noteUpdated(String(amountK), catLabel, note));
+    return;
+  }
+
+  await sendMessage(
+    L.telegram.noteUpdatedAsk(String(amountK), note),
+    {
+      reply_markup: {
+        inline_keyboard: buildCategoryKeyboard(txId),
+      },
+    }
+  );
+}
+
 async function handleCallbackQuery(query: any) {
   const data = query.data;
   const parts = data.split(':');
@@ -227,7 +242,6 @@ async function handleCallbackQuery(query: any) {
       {
         reply_markup: {
           force_reply: true,
-          selective: true,
           input_field_placeholder: tx.note || 'Ghi chú mới...',
         },
       }

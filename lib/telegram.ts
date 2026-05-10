@@ -69,7 +69,7 @@ export function buildCategoryKeyboard(transactionId: string) {
   // Add saving + edit note buttons at the bottom
   rows.push([
     { text: `${SAVING_CATEGORY.icon} ${SAVING_CATEGORY.label}`, callback_data: `cat:${transactionId}:saving` },
-    { text: '✏️ Sua ghi chu', callback_data: `note:${transactionId}` },
+    { text: '✏️ Sửa ghi chú', callback_data: `note:${transactionId}` },
   ]);
   return rows;
 }

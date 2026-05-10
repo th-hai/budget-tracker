@@ -34,6 +34,19 @@ export const L = {
     totalSpending: 'Tổng chi',
   },
 
+  analytics: {
+    transactions: (count: number) => `${count} giao dịch`,
+    categoryShare: (percentage: number) => `${percentage}% tổng danh mục`,
+    transactionCount: 'Số giao dịch',
+    average: 'Trung bình',
+    largest: 'Lớn nhất',
+    totalSpending: 'Tổng chi',
+    largestInsight: (note: string, share: number, category: string) =>
+      `${note} chiếm ${share}% danh mục ${category}`,
+    emptyCategory: 'Chưa có giao dịch trong danh mục này',
+    emptyCategoryHint: 'Dữ liệu sẽ hiện ở đây sau khi có giao dịch mới',
+  },
+
   // Transactions page
   transactions: {
     filterAll: 'Tất cả',
@@ -44,6 +57,8 @@ export const L = {
     dateRange: 'Chọn ngày',
     dateRangeActive: 'Lọc ngày',
     walletAll: 'Tất cả',
+    searchPlaceholder: 'Tìm theo ghi chú...',
+    searchClear: 'Xoá tìm kiếm',
     emptyList: 'Chưa có giao dịch nào',
     emptyListHint: 'Gửi tin nhắn Telegram để thêm',
   },
@@ -114,6 +129,14 @@ export const L = {
     source: 'Nguồn',
     bank: 'Ngân hàng',
     refCode: 'Mã giao dịch',
+    edit: 'Sửa',
+    delete: 'Xoá',
+    cancel: 'Huỷ',
+    save: 'Lưu',
+    saving: 'Đang lưu...',
+    confirmDelete: 'Xoá giao dịch này?',
+    note: 'Ghi chú',
+    amount: 'Số tiền',
   },
 
   // Sources
@@ -174,9 +197,10 @@ export const L = {
       `📂 Chọn danh mục:`,
     editNotePrompt: (amount: string, txId: string) =>
       `✏️ <b>Sửa ghi chú</b>\n\n` +
-      `Giao dịch: <b>${amount}k</b>\n` +
-      `Reply:\n` +
-      `<code>#note_${txId}</code>`,
+      `Giao dịch: <b>${amount}k</b>\n\n` +
+      `Reply tin nhắn này với ghi chú mới.\n` +
+      `Nếu Telegram không mở chế độ reply, gửi:\n` +
+      `<code>#note_${txId} ghi chú mới</code>`,
     txNotFound: '❌ Không tìm thấy giao dịch.',
     todayTitle: '📅 <b>Tổng kết hôm nay</b>',
     todayEmpty: '🫥 Hôm nay chưa có giao dịch nào.',
