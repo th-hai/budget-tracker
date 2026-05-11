@@ -285,10 +285,10 @@ async function handleCallbackQuery(query: any) {
 async function handleTodaySummary() {
   await connectDB();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const VN_MS = 7 * 60 * 60 * 1000;
+  const vn = new Date(Date.now() + VN_MS);
+  const today = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - VN_MS);
+  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
   const transactions = await Transaction.find({
     transactionDate: { $gte: today, $lt: tomorrow },
@@ -329,9 +329,10 @@ async function handleTodaySummary() {
 async function handleMonthSummary() {
   await connectDB();
 
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const VN_MS = 7 * 60 * 60 * 1000;
+  const vn = new Date(Date.now() + VN_MS);
+  const start = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), 1) - VN_MS);
+  const end = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth() + 1, 1) - VN_MS - 1);
 
   const totals = await Transaction.aggregate([
     {

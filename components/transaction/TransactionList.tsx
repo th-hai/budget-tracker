@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import TransactionCard from './TransactionCard';
-import { formatDateSmart, formatVNDShort } from '@/lib/format';
+import { formatDateSmart, formatVNDShort, toVNDateKey } from '@/lib/format';
 import Card from '@/components/ui/Card';
 import { L } from '@/lib/labels';
 
@@ -23,7 +23,7 @@ export default function TransactionList({ transactions, onSelect }: TransactionL
   const grouped = useMemo(() => {
     const groups: Record<string, Transaction[]> = {};
     transactions.forEach((tx) => {
-      const dateKey = new Date(tx.transactionDate).toISOString().split('T')[0];
+      const dateKey = toVNDateKey(tx.transactionDate);
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(tx);
     });

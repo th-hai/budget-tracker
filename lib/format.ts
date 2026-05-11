@@ -1,3 +1,12 @@
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+/** Convert a date to YYYY-MM-DD string in Vietnam timezone (UTC+7) */
+export function toVNDateKey(date: Date | string): string {
+  const d = new Date(date);
+  const vn = new Date(d.getTime() + VN_OFFSET_MS);
+  return vn.toISOString().split('T')[0];
+}
+
 export function formatVND(amount: number): string {
   return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
 }
@@ -44,17 +53,16 @@ export function getMonthLabel(month: number, year: number): string {
 export function formatDateSmart(date: Date | string): string {
   // Import inline to avoid circular deps at module level
   const { L } = require('./labels');
-  const d = new Date(date);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diff = today.getTime() - target.getTime();
-  const days = Math.round(diff / (1000 * 60 * 60 * 24));
+  const todayKey = toVNDateKey(new Date());
+  const targetKey = toVNDateKey(date);
+  const diff = (new Date(todayKey).getTime() - new Date(targetKey).getTime()) / (1000 * 60 * 60 * 24);
+  const days = Math.round(diff);
 
   if (days === 0) return L.date.today;
   if (days === 1) return L.date.yesterday;
   if (days < 7) return L.date.daysAgo(days);
-  return `${d.getDate()} Tháng ${d.getMonth() + 1}`;
+  const [, m, d] = targetKey.split('-').map(Number);
+  return `${d} Tháng ${m}`;
 }
 
 export function formatSourceLabel(source: string): string {

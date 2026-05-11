@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import fetcher from '@/lib/api';
-import { formatVND, formatVNDShort, formatDateSmart, formatTime } from '@/lib/format';
+import { formatVND, formatVNDShort, formatDateSmart, formatTime, toVNDateKey } from '@/lib/format';
 import PageShell from '@/components/layout/PageShell';
 import Card from '@/components/ui/Card';
 import Segmented from '@/components/ui/Segmented';
@@ -57,6 +57,28 @@ function getSpendingLabel(range: string) {
   if (range === 'today') return L.spending.todayTitle;
   if (range === 'week') return L.spending.weekTitle;
   return L.spending.monthTitle;
+}
+
+const VN_WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+function getDateRangeLabel(range: string, month: number, year: number) {
+  const VN_MS = 7 * 60 * 60 * 1000;
+  const vn = new Date(Date.now() + VN_MS);
+  const vY = vn.getUTCFullYear(), vM = vn.getUTCMonth(), vD = vn.getUTCDate();
+  const p = (n: number) => (n < 10 ? `0${n}` : String(n));
+
+  if (range === 'today') {
+    const dow = vn.getUTCDay();
+    return `${VN_WEEKDAYS[dow]} ${p(vD)}/${p(vM + 1)}/${vY}`;
+  }
+  if (range === 'week') {
+    const day = vn.getUTCDay();
+    const monDate = new Date(Date.UTC(vY, vM, vD - ((day + 6) % 7)));
+    const sunDate = new Date(Date.UTC(vY, vM, vD - ((day + 6) % 7) + 6));
+    return `${p(monDate.getUTCDate())}/${p(monDate.getUTCMonth() + 1)} - ${p(sunDate.getUTCDate())}/${p(sunDate.getUTCMonth() + 1)}`;
+  }
+  const lastDay = new Date(year, month, 0).getDate();
+  return `01/${p(month)} - ${p(lastDay)}/${p(month)}`;
 }
 
 function SpendingTrend({ change }: { change: number | null }) {
@@ -174,7 +196,7 @@ export default function Dashboard() {
     if (!recent?.data?.length) return [];
     const groups: Record<string, any[]> = {};
     recent.data.forEach((tx: any) => {
-      const dateKey = new Date(tx.transactionDate).toISOString().split('T')[0];
+      const dateKey = toVNDateKey(tx.transactionDate);
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(tx);
     });
@@ -239,7 +261,10 @@ export default function Dashboard() {
           {/* ─── Spending Hero ─── */}
           <Card className="relative overflow-hidden">
             <div className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-coral/8" />
-            <p className="mb-1 text-xs font-bold text-[color:var(--text-muted)]">{getSpendingLabel(range)}</p>
+            <div className="mb-1 flex items-baseline justify-between">
+              <p className="text-xs font-bold text-[color:var(--text-muted)]">{getSpendingLabel(range)}</p>
+              <p className="text-[11px] font-semibold text-[color:var(--text-muted)]">{getDateRangeLabel(range, month, year)}</p>
+            </div>
             <p className="text-[40px] font-bold leading-none tracking-[-0.06em] text-coral">
               -{formatVND(summary.totalExpense)}
             </p>

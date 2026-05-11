@@ -133,6 +133,7 @@ export default async function handler(
                 $dateToString: {
                   format: '%Y-%m-%d',
                   date: '$transactionDate',
+                  timezone: 'Asia/Ho_Chi_Minh',
                 },
               },
               type: '$type',
