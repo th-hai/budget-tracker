@@ -351,7 +351,7 @@ async function handleMonthSummary() {
   const balanceK = totalInK - totalOutK;
 
   await sendMessage(
-    `${L.telegram.monthTitle(now.getMonth() + 1, now.getFullYear())}\n\n` +
+    `${L.telegram.monthTitle(vn.getUTCMonth() + 1, vn.getUTCFullYear())}\n\n` +
       `${L.telegram.monthIncome(totalInK.toLocaleString())}\n` +
       `${L.telegram.monthExpense(totalOutK.toLocaleString())}\n` +
       L.telegram.monthBalance(balanceK.toLocaleString(), balanceK >= 0)
