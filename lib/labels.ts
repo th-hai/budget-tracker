@@ -28,6 +28,7 @@ export const L = {
     totalSpending: 'Tổng chi',
     income: 'Thu nhập',
     expense: 'Chi tiêu',
+    balance: 'Còn lại',
   },
 
   // Spending hero

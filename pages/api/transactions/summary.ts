@@ -17,27 +17,29 @@ function vnMidnightUTC(y: number, m: number, d: number) {
   return new Date(Date.UTC(y, m, d) - VN_OFFSET_MS);
 }
 
-function getDateRange(range: string, month: number, year: number) {
+function getDateRange(range: string, month: number, year: number, offset: number = 0) {
   const vn = nowVN();
   const vY = vn.getUTCFullYear(), vM = vn.getUTCMonth(), vD = vn.getUTCDate();
 
   if (range === 'today') {
-    const start = vnMidnightUTC(vY, vM, vD);
-    const end = new Date(vnMidnightUTC(vY, vM, vD + 1).getTime() - 1);
+    const d = vD + offset;
+    const start = vnMidnightUTC(vY, vM, d);
+    const end = new Date(vnMidnightUTC(vY, vM, d + 1).getTime() - 1);
     return { start, end };
   }
 
   if (range === 'week') {
     const day = vn.getUTCDay(); // 0=Sun
-    const mondayD = vD - ((day + 6) % 7);
+    const mondayD = vD - ((day + 6) % 7) + offset * 7;
     const start = vnMidnightUTC(vY, vM, mondayD);
     const end = new Date(vnMidnightUTC(vY, vM, mondayD + 7).getTime() - 1);
     return { start, end };
   }
 
   // Default: month
-  const start = vnMidnightUTC(year, month - 1, 1);
-  const end = new Date(vnMidnightUTC(year, month, 1).getTime() - 1);
+  const m = month - 1 + offset;
+  const start = vnMidnightUTC(year, m, 1);
+  const end = new Date(vnMidnightUTC(year, m + 1, 1).getTime() - 1);
   return { start, end };
 }
 
@@ -55,8 +57,9 @@ export default async function handler(
   const month = Number(req.query.month) || now.getMonth() + 1;
   const year = Number(req.query.year) || now.getFullYear();
   const range = (req.query.range as string) || 'month';
+  const offset = Number(req.query.offset) || 0;
 
-  const { start, end } = getDateRange(range, month, year);
+  const { start, end } = getDateRange(range, month, year, offset);
 
   const dateFilter = {
     transactionDate: { $gte: start, $lte: end },
@@ -67,35 +70,11 @@ export default async function handler(
   const noSavingFilter = { ...dateFilter, category: { $ne: 'saving' } };
 
   // Calculate previous period for comparison
-  function getPrevPeriod(r: string, m: number, y: number) {
-    if (r === 'today') {
-      const vn = nowVN();
-      const vY = vn.getUTCFullYear(), vM = vn.getUTCMonth(), vD = vn.getUTCDate();
-      return {
-        start: vnMidnightUTC(vY, vM, vD - 1),
-        end: new Date(vnMidnightUTC(vY, vM, vD).getTime() - 1),
-      };
-    }
-    if (r === 'week') {
-      const vn = nowVN();
-      const vD = vn.getUTCDate();
-      const day = vn.getUTCDay();
-      const mondayD = vD - ((day + 6) % 7);
-      return {
-        start: vnMidnightUTC(vn.getUTCFullYear(), vn.getUTCMonth(), mondayD - 7),
-        end: new Date(vnMidnightUTC(vn.getUTCFullYear(), vn.getUTCMonth(), mondayD).getTime() - 1),
-      };
-    }
-    // Previous month
-    const pm = m === 1 ? 12 : m - 1;
-    const py = m === 1 ? y - 1 : y;
-    return {
-      start: vnMidnightUTC(py, pm - 1, 1),
-      end: new Date(vnMidnightUTC(py, pm, 1).getTime() - 1),
-    };
+  function getPrevPeriod(r: string, m: number, y: number, off: number) {
+    return getDateRange(r, m, y, off - 1);
   }
 
-  const prev = getPrevPeriod(range, month, year);
+  const prev = getPrevPeriod(range, month, year, offset);
   const prevFilter = {
     transactionDate: { $gte: prev.start, $lte: prev.end },
     categorized: true,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import fetcher from '@/lib/api';
 import { formatVND, formatVNDShort, formatDateSmart, formatTime, toVNDateKey } from '@/lib/format';
@@ -61,37 +61,91 @@ function getSpendingLabel(range: string) {
 
 const VN_WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
-function getDateRangeLabel(range: string, month: number, year: number) {
+function getDateRangeLabel(range: string, month: number, year: number, offset: number = 0) {
   const VN_MS = 7 * 60 * 60 * 1000;
   const vn = new Date(Date.now() + VN_MS);
   const vY = vn.getUTCFullYear(), vM = vn.getUTCMonth(), vD = vn.getUTCDate();
   const p = (n: number) => (n < 10 ? `0${n}` : String(n));
 
   if (range === 'today') {
-    const dow = vn.getUTCDay();
-    return `${VN_WEEKDAYS[dow]} ${p(vD)}/${p(vM + 1)}/${vY}`;
+    const target = new Date(Date.UTC(vY, vM, vD + offset));
+    const dow = target.getUTCDay();
+    return `${VN_WEEKDAYS[dow]} ${p(target.getUTCDate())}/${p(target.getUTCMonth() + 1)}/${target.getUTCFullYear()}`;
   }
   if (range === 'week') {
     const day = vn.getUTCDay();
-    const monDate = new Date(Date.UTC(vY, vM, vD - ((day + 6) % 7)));
-    const sunDate = new Date(Date.UTC(vY, vM, vD - ((day + 6) % 7) + 6));
+    const mondayD = vD - ((day + 6) % 7) + offset * 7;
+    const monDate = new Date(Date.UTC(vY, vM, mondayD));
+    const sunDate = new Date(Date.UTC(vY, vM, mondayD + 6));
     return `${p(monDate.getUTCDate())}/${p(monDate.getUTCMonth() + 1)} - ${p(sunDate.getUTCDate())}/${p(sunDate.getUTCMonth() + 1)}`;
   }
-  const lastDay = new Date(year, month, 0).getDate();
-  return `01/${p(month)} - ${p(lastDay)}/${p(month)}`;
+  const m = month - 1 + offset;
+  const mStart = new Date(year, m, 1);
+  const mEnd = new Date(year, m + 1, 0);
+  return `01/${p(mStart.getMonth() + 1)} - ${p(mEnd.getDate())}/${p(mStart.getMonth() + 1)}`;
+}
+
+function RollingChar({ char, delay }: { char: string; delay: number }) {
+  const [current, setCurrent] = useState(char);
+  const [prev, setPrev] = useState(char);
+  const [rolling, setRolling] = useState(false);
+  const isFirst = useRef(true);
+
+  useEffect(() => {
+    if (isFirst.current) { isFirst.current = false; setCurrent(char); setPrev(char); return; }
+    if (char === current) return;
+    setPrev(current);
+    setRolling(true);
+    const t = setTimeout(() => { setCurrent(char); setRolling(false); }, delay);
+    return () => clearTimeout(t);
+  }, [char]);
+
+  const isDigit = /\d/.test(char);
+  if (!isDigit) return <span className="inline-block">{char}</span>;
+
+  return (
+    <span className="inline-block overflow-hidden relative" style={{ height: '1em', width: '0.6em' }}>
+      <span
+        className="block transition-transform duration-500 ease-out"
+        style={{ transform: rolling ? 'translateY(-100%)' : 'translateY(0)' }}
+      >
+        {rolling ? prev : current}
+      </span>
+      {rolling && (
+        <span
+          className="block absolute left-0 transition-transform duration-500 ease-out"
+          style={{ top: '100%', transform: rolling ? 'translateY(-100%)' : 'translateY(0)' }}
+        >
+          {char}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function RollingAmount({ text }: { text: string }) {
+  return (
+    <span className="inline-flex">
+      {text.split('').map((ch, i) => (
+        <RollingChar key={i} char={ch} delay={50 + i * 30} />
+      ))}
+    </span>
+  );
 }
 
 function SpendingTrend({ change }: { change: number | null }) {
   if (change === null) return (
-    <span className="text-[11px] font-semibold text-[color:var(--text-muted)]">
+    <span className="inline-flex items-center rounded-full bg-nero/[0.06] px-2 py-0.5 text-[10px] font-bold text-[color:var(--text-muted)] dark:bg-white/[0.08]">
       {L.spending.noComparison}
     </span>
   );
 
   const isDown = change < 0;
   const isZero = change === 0;
+  const bg = isZero ? 'bg-nero/[0.06] dark:bg-white/[0.08]' : isDown ? 'bg-emerald-500/10' : 'bg-coral/10';
+  const text = isZero ? 'text-[color:var(--text-muted)]' : isDown ? 'text-emerald-600 dark:text-emerald-400' : 'text-coral';
   return (
-    <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${isZero ? 'text-[color:var(--text-muted)]' : isDown ? 'text-teal' : 'text-coral'}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${bg} ${text}`}>
       {!isZero && (
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={isDown ? '' : 'rotate-180'}>
           <path d="M5 2L2 7h6L5 2z" fill="currentColor" />
@@ -101,6 +155,7 @@ function SpendingTrend({ change }: { change: number | null }) {
     </span>
   );
 }
+
 
 function TransactionRow({ tx, onClick }: { tx: any; onClick: () => void }) {
   const cat = getCategoryByKey(tx.category);
@@ -115,11 +170,11 @@ function TransactionRow({ tx, onClick }: { tx: any; onClick: () => void }) {
       <CategoryIcon category={tx.category} size={36} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold">{tx.note || cat?.label || 'Giao dịch'}</p>
-        <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--text-muted)]">
+        <p className="mt-0.5 text-[11px] font-medium text-[color:var(--text-muted)]">
           {cat?.label || tx.category} · {formatTime(tx.transactionDate)}
         </p>
       </div>
-      <span className={`shrink-0 text-sm font-bold ${isPositive ? 'text-teal' : 'text-coral'}`}>
+      <span className={`shrink-0 text-sm font-bold ${isPositive ? 'text-emerald-500' : 'text-coral'}`}>
         {isPositive ? '+' : '-'}{formatVNDShort(tx.amount)}
       </span>
     </button>
@@ -155,11 +210,14 @@ export default function Dashboard() {
   const year = now.getFullYear();
   const { chartType, dark, setDark } = useTheme();
   const [range, setRange] = useState('today');
+  const [offset, setOffset] = useState(0);
   const [selectedTx, setSelectedTx] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  const handleRangeChange = (r: string) => { setRange(r); setOffset(0); };
+
   const { data: summary, isLoading: summaryLoading, mutate: mutateSummary } = useSWR(
-    `/api/transactions/summary?month=${month}&year=${year}&range=${range}`,
+    `/api/transactions/summary?month=${month}&year=${year}&range=${range}&offset=${offset}`,
     fetcher,
     { refreshInterval: 30000 }
   );
@@ -247,7 +305,7 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <Segmented options={RANGES} value={range} onChange={setRange} className="mb-4" />
+      <Segmented options={RANGES} value={range} onChange={handleRangeChange} className="mb-4" />
 
       {loading ? (
         <div className="space-y-4">
@@ -261,32 +319,56 @@ export default function Dashboard() {
           {/* ─── Spending Hero ─── */}
           <Card className="relative overflow-hidden">
             <div className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-coral/8" />
-            <div className="mb-1 flex items-baseline justify-between">
-              <p className="text-xs font-bold text-[color:var(--text-muted)]">{getSpendingLabel(range)}</p>
-              <p className="text-[11px] font-semibold text-[color:var(--text-muted)]">{getDateRangeLabel(range, month, year)}</p>
-            </div>
-            <p className="text-[40px] font-bold leading-none tracking-[-0.06em] text-coral">
-              -{formatVND(summary.totalExpense)}
-            </p>
-            <div className="mt-3 flex items-center gap-3">
-              <SpendingTrend change={summary.spendingChange} />
-            </div>
-            {insight && (
-              <p className="mt-2 text-[11px] font-semibold text-[color:var(--text-muted)]">{insight}</p>
-            )}
-            {(summary.totalIncome > 0 || summary.totalExpense > 0) && (
-              <div className="mt-4 flex gap-3 border-t border-nero/8 pt-3 dark:border-white/8">
-                <div className="flex-1">
-                  <p className="text-[11px] font-semibold text-[color:var(--text-muted)]">{L.dashboard.income}</p>
-                  <p className="text-sm font-bold text-teal">+{formatVNDShort(summary.totalIncome)}</p>
-                </div>
-                <div className="w-px bg-nero/8 dark:bg-white/8" />
-                <div className="flex-1">
-                  <p className="text-[11px] font-semibold text-[color:var(--text-muted)]">{L.dashboard.expense}</p>
-                  <p className="text-sm font-bold text-coral">-{formatVNDShort(summary.totalExpense)}</p>
-                </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold">{getSpendingLabel(range)}</p>
+              {/* Neumorphic date pill */}
+              <div
+                className="inline-flex items-center gap-1 rounded-full py-1.5 px-1.5"
+                style={{
+                  background: 'var(--surface-soft)',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06), 0 1px 1px rgba(255,255,255,0.7)',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setOffset(offset - 1)}
+                  className="flex h-6 w-6 items-center justify-center rounded-full transition-all active:scale-90 hover:scale-110 hover:shadow-md"
+                  style={{
+                    background: 'var(--surface-card)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 1px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+                <span className="text-[11px] font-bold px-2 min-w-0 select-none">
+                  {getDateRangeLabel(range, month, year, offset)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOffset(offset + 1)}
+                  disabled={offset >= 0}
+                  className="flex h-6 w-6 items-center justify-center rounded-full transition-all active:scale-90 hover:scale-110 hover:shadow-md disabled:opacity-25 disabled:pointer-events-none"
+                  style={{
+                    background: 'var(--surface-card)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 1px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
               </div>
-            )}
+            </div>
+            <p
+              className="mt-3 text-[36px] font-bold leading-none tracking-[-0.04em] text-coral"
+              style={{ filter: 'drop-shadow(0 2px 8px rgba(255,107,107,0.25))' }}
+            >
+              <RollingAmount text={`-${formatVND(summary.totalExpense)}`} />
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <SpendingTrend change={summary.spendingChange} />
+              {insight && (
+                <span className="text-[11px] font-medium text-[color:var(--text-muted)]">{insight}</span>
+              )}
+            </div>
           </Card>
 
           {/* ─── Daily Allowance ─── */}
@@ -383,6 +465,7 @@ export default function Dashboard() {
               cats={summary.categoryBreakdown || []}
               daily={summary.dailySpending || []}
               chartType={chartType}
+              daysInRange={range === 'today' ? 1 : range === 'week' ? 7 : summary.daysInMonth || 30}
               onSelectCategory={setSelectedCategory}
             />
           </Card>

@@ -21,6 +21,7 @@ interface CategoryAnalyticsProps {
   cats: CategoryData[];
   daily?: DailyData[];
   chartType: ChartType;
+  daysInRange?: number;
   onSelectCategory?: (category: string) => void;
 }
 
@@ -35,8 +36,8 @@ type CatWithColor = CategoryData & { color: string; label: string };
 function AnimatedDonut({ cats, total, onSelect }: { cats: CatWithColor[]; total: number; onSelect?: (cat: string) => void }) {
   const [mounted, setMounted] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
-  const size = 138;
-  const stroke = 14;
+  const size = 116;
+  const stroke = 12;
   const radius = (size - stroke) / 2;
   const circle = 2 * Math.PI * radius;
 
@@ -64,7 +65,7 @@ function AnimatedDonut({ cats, total, onSelect }: { cats: CatWithColor[]; total:
   const active = activeIdx >= 0 ? cats[activeIdx] : null;
 
   return (
-    <div className="relative h-[138px] w-[138px] shrink-0">
+    <div className="relative h-[116px] w-[116px] shrink-0">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" style={{ cursor: 'pointer' }}>
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--track)" strokeWidth={stroke} />
         {cats.map((cat, i) => {
@@ -80,15 +81,14 @@ function AnimatedDonut({ cats, total, onSelect }: { cats: CatWithColor[]; total:
               r={radius}
               fill="none"
               stroke={cat.color}
-              strokeWidth={isActive ? stroke + 4 : stroke}
+              strokeWidth={stroke}
               strokeDasharray={`${Math.max(0, seg.len)} ${circle - seg.len}`}
               strokeDashoffset={dashOffset}
               strokeLinecap="butt"
               opacity={isOther ? 0.35 : 1}
               style={{
-                transition: `stroke-dashoffset 800ms ease-out ${i * 40}ms, stroke-width 200ms ease, opacity 200ms ease`,
+                transition: `stroke-dashoffset 800ms ease-out ${i * 40}ms, opacity 200ms ease`,
                 cursor: 'pointer',
-                filter: isActive ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' : 'none',
               }}
               onMouseEnter={() => setActiveIdx(i)}
               onMouseLeave={() => setActiveIdx(-1)}
@@ -100,15 +100,15 @@ function AnimatedDonut({ cats, total, onSelect }: { cats: CatWithColor[]; total:
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
         {active ? (
           <>
-            <span className="text-lg font-bold tracking-[-0.04em]">{formatVNDShort(active.total)}</span>
-            <span className="text-[10px] font-bold" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-base font-bold tracking-[-0.04em]">{formatVNDShort(active.total)}</span>
+            <span className="text-[9px] font-bold" style={{ color: 'var(--text-muted)' }}>
               {active.label}
             </span>
           </>
         ) : (
           <>
-            <span className="text-xl font-bold tracking-[-0.04em]">{formatVNDShort(total)}</span>
-            <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>Tổng chi</span>
+            <span className="text-lg font-bold tracking-[-0.04em]">{formatVNDShort(total)}</span>
+            <span className="text-[9px] font-semibold" style={{ color: 'var(--text-muted)' }}>Tổng chi</span>
           </>
         )}
       </div>
@@ -190,7 +190,7 @@ function DailyChart({ daily }: { daily: DailyData[] }) {
 }
 
 // ─── Main export ──────────────────────────────────────
-export default function CategoryAnalytics({ cats, daily = [], chartType, onSelectCategory }: CategoryAnalyticsProps) {
+export default function CategoryAnalytics({ cats, daily = [], chartType, daysInRange = 1, onSelectCategory }: CategoryAnalyticsProps) {
   const prepared = useMemo(() => cats
     .filter((cat) => cat.total > 0)
     .map((cat, index) => {
@@ -212,46 +212,57 @@ export default function CategoryAnalytics({ cats, daily = [], chartType, onSelec
 
   return (
     <div>
-      <div className="flex items-center gap-4">
-        {chartType === 'donut' && <AnimatedDonut cats={top} total={total} onSelect={onSelectCategory} />}
-        {chartType === 'bar' && <BarChart cats={top} onSelect={onSelectCategory} />}
-        {chartType === 'stacked' && <StackedChart cats={top} total={total} onSelect={onSelectCategory} />}
-        {chartType === 'daily' && <DailyChart daily={daily} />}
+      <div className="grid grid-cols-2 items-center">
+        <div className="flex justify-center">
+          {chartType === 'donut' && <AnimatedDonut cats={top} total={total} onSelect={onSelectCategory} />}
+          {chartType === 'bar' && <BarChart cats={top} onSelect={onSelectCategory} />}
+          {chartType === 'stacked' && <StackedChart cats={top} total={total} onSelect={onSelectCategory} />}
+          {chartType === 'daily' && <DailyChart daily={daily} />}
+        </div>
 
-        <div className="grid flex-1 grid-cols-1 gap-2">
-          {top.slice(0, 3).map((cat) => (
+        <div className="flex flex-col gap-1.5 pl-2">
+          {top.slice(0, 4).map((cat) => (
             <button
               key={cat.category}
               type="button"
               onClick={() => onSelectCategory?.(cat.category)}
-              className="flex items-center gap-2 text-left transition-opacity active:opacity-70"
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-opacity active:opacity-70"
+              style={{ backgroundColor: `${cat.color}10` }}
             >
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cat.color }} />
-              <span className="min-w-0 flex-1 truncate text-xs font-semibold">{cat.label}</span>
-              <span className="text-xs font-bold">{formatVNDShort(cat.total)}</span>
+              <span className="min-w-0 flex-1 truncate text-[12px] font-semibold" style={{ color: cat.color }}>{cat.label}</span>
+              <span className="text-[12px] font-bold" style={{ color: cat.color }}>{formatVNDShort(cat.total)}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="mt-4 space-y-3 border-t border-nero/8 pt-4 dark:border-white/8">
+      <div className="mt-4 space-y-1.5 border-t border-nero/8 pt-4 dark:border-white/8">
         {rows.map((cat) => {
           const budget = cat.budget || total;
+          const pct = total > 0 ? Math.round((cat.total / total) * 100) : 0;
+          const avgDay = daysInRange > 1 ? Math.round(cat.total / daysInRange) : null;
           return (
             <button
               key={cat.category}
               type="button"
               onClick={() => onSelectCategory?.(cat.category)}
-              className="w-full text-left active:scale-[0.99] transition-transform"
+              className="w-full text-left active:scale-[0.99] transition-transform rounded-2xl px-2.5 py-2 flex items-center gap-2.5"
+              style={{ backgroundColor: `${cat.color}10` }}
             >
-              <div className="mb-2 flex items-center gap-3">
-                <CategoryIcon category={cat.category} size={30} />
-                <span className="flex-1 text-sm font-bold">{cat.label}</span>
-                <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
-                  {formatVNDShort(cat.total)} / {formatVNDShort(budget)}
-                </span>
+              <CategoryIcon category={cat.category} size={34} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[13px] font-bold truncate" style={{ color: cat.color }}>{cat.label}</span>
+                    {avgDay !== null && (
+                      <span className="text-[10px] font-medium text-[color:var(--text-muted)] shrink-0">TB {formatVNDShort(avgDay)}/ngày</span>
+                    )}
+                  </div>
+                  <span className="text-[14px] font-bold shrink-0 ml-2" style={{ color: cat.color }}>{pct}%</span>
+                </div>
+                <Progress value={cat.total} max={budget} height={4} accent={cat.color} />
               </div>
-              <Progress value={cat.total} max={budget} height={5} />
             </button>
           );
         })}
