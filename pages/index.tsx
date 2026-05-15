@@ -37,19 +37,30 @@ function toDateInputValue(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function getClientDateRange(range: string, month: number, year: number) {
-  const now = new Date();
-  if (range === 'today') return { startDate: toDateInputValue(now), endDate: toDateInputValue(now) };
-  if (range === 'week') {
-    const day = now.getDay();
-    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((day + 6) % 7));
-    const sunday = new Date(monday);
-    sunday.setDate(sunday.getDate() + 6);
-    return { startDate: toDateInputValue(monday), endDate: toDateInputValue(sunday) };
+function getClientDateRange(range: string, month: number, year: number, offset: number = 0) {
+  const VN_MS = 7 * 60 * 60 * 1000;
+  const vn = new Date(Date.now() + VN_MS);
+  const vY = vn.getUTCFullYear(), vM = vn.getUTCMonth(), vD = vn.getUTCDate();
+
+  if (range === 'today') {
+    const d = new Date(Date.UTC(vY, vM, vD + offset));
+    const s = toDateInputValue(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    return { startDate: s, endDate: s };
   }
+  if (range === 'week') {
+    const day = new Date(Date.UTC(vY, vM, vD)).getUTCDay();
+    const mondayD = vD - ((day + 6) % 7) + offset * 7;
+    const mon = new Date(Date.UTC(vY, vM, mondayD));
+    const sun = new Date(Date.UTC(vY, vM, mondayD + 6));
+    return {
+      startDate: toDateInputValue(new Date(mon.getUTCFullYear(), mon.getUTCMonth(), mon.getUTCDate())),
+      endDate: toDateInputValue(new Date(sun.getUTCFullYear(), sun.getUTCMonth(), sun.getUTCDate())),
+    };
+  }
+  const m = month - 1 + offset;
   return {
-    startDate: toDateInputValue(new Date(year, month - 1, 1)),
-    endDate: toDateInputValue(new Date(year, month, 0)),
+    startDate: toDateInputValue(new Date(year, m, 1)),
+    endDate: toDateInputValue(new Date(year, m + 1, 0)),
   };
 }
 
@@ -235,7 +246,7 @@ export default function Dashboard() {
       percentage: categoryBreakdownTotal > 0 ? Math.round((selectedCategorySummaryRaw.total / categoryBreakdownTotal) * 100) : 0,
     }
     : undefined;
-  const selectedRange = getClientDateRange(range, month, year);
+  const selectedRange = getClientDateRange(range, month, year, offset);
   const categoryTxParams = new URLSearchParams({
     limit: '100',
     category: selectedCategory || '',
