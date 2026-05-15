@@ -54,11 +54,53 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 
 function DailySpendingChart({ daily }: { daily: any[] }) {
   const series = daily.slice(-14);
+  const [hoverBar, setHoverBar] = useState(-1);
+  const [hoverLine, setHoverLine] = useState(false);
+  const [lineIdx, setLineIdx] = useState(-1);
+
   if (!series.length) return null;
 
   const expenses = series.map(d => d.expense || 0);
   const max = Math.max(...expenses, 1);
   const avg = expenses.reduce((s, v) => s + v, 0) / Math.max(expenses.length, 1);
+
+  const chartH = 140;
+  const labelH = 16;
+  const topPad = 18;
+  const barAreaH = chartH - labelH - topPad;
+  const n = series.length;
+
+  const movingAvg = expenses.map((_, i) => {
+    const w = 3;
+    const start = Math.max(0, i - Math.floor(w / 2));
+    const end = Math.min(expenses.length, i + Math.ceil(w / 2) + 1);
+    const slice = expenses.slice(start, end);
+    return slice.reduce((s, v) => s + v, 0) / slice.length;
+  });
+
+  function smoothPath(values: number[]): string {
+    if (values.length < 2) return '';
+    const points = values.map((v, i) => ({
+      x: (i / (n - 1)) * 100,
+      y: topPad + barAreaH - (v / max) * barAreaH,
+    }));
+    let d = `M${points[0].x},${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[Math.max(0, i - 1)];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[Math.min(points.length - 1, i + 2)];
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    }
+    return d;
+  }
+
+  const barsBlurred = hoverLine;
+  const lineBlurred = hoverBar >= 0;
 
   return (
     <div>
@@ -68,39 +110,143 @@ function DailySpendingChart({ daily }: { daily: any[] }) {
           TB: {formatVNDShort(avg)}
         </span>
       </div>
-      <div className="flex h-[120px] items-end gap-1">
-        {series.map((item, i) => {
-          const val = item.expense || 0;
-          const h = Math.max(4, (val / max) * 100);
-          const isToday = i === series.length - 1;
-          const aboveAvg = val > avg * 1.2;
-          return (
-            <div key={item.date} className="flex flex-1 flex-col items-center gap-1">
+      <div
+        className="relative"
+        style={{ height: chartH }}
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const xRatio = x / rect.width;
+          const idx = Math.round(xRatio * (n - 1));
+          const clampedIdx = Math.max(0, Math.min(n - 1, idx));
+          // Compute line Y position in pixels
+          const svgH = chartH - labelH;
+          const lineY = (topPad + barAreaH - (movingAvg[clampedIdx] / max) * barAreaH) * (rect.height * (svgH / chartH)) / svgH;
+          const distToLine = Math.abs(y - lineY);
+          if (distToLine < 16) {
+            setHoverLine(true);
+            setLineIdx(clampedIdx);
+            setHoverBar(-1);
+          } else {
+            setHoverLine(false);
+            setLineIdx(-1);
+          }
+        }}
+        onMouseLeave={() => { setHoverBar(-1); setHoverLine(false); setLineIdx(-1); }}
+      >
+        {/* Bars */}
+        <div
+          className="absolute inset-0 flex items-end gap-1 transition-all duration-200"
+          style={{ paddingTop: topPad, paddingBottom: labelH, opacity: barsBlurred ? 0.25 : 1, filter: barsBlurred ? 'blur(1.5px)' : 'none' }}
+        >
+          {series.map((item, i) => {
+            const val = item.expense || 0;
+            const h = Math.max(4, (val / max) * barAreaH);
+            const isToday = i === series.length - 1;
+            const aboveAvg = val > avg * 1.2;
+            const isActive = hoverBar === i;
+            const dimmed = hoverBar >= 0 && !isActive;
+            return (
               <div
-                className="w-full rounded-t-md transition-all duration-300"
-                style={{
-                  height: h,
-                  backgroundColor: isToday
-                    ? 'var(--accent)'
-                    : aboveAvg
-                      ? '#F4845F'
-                      : 'var(--chart-muted)',
-                  opacity: isToday ? 1 : 0.7,
-                }}
-              />
-              <span className="text-[8px] font-semibold text-[color:var(--text-muted)]">
-                {item.date.slice(8)}
-              </span>
-            </div>
-          );
-        })}
+                key={item.date}
+                className="flex flex-1 flex-col items-center justify-end h-full cursor-pointer transition-opacity duration-150"
+                style={{ opacity: dimmed ? 0.35 : 1 }}
+                onMouseEnter={() => { if (!hoverLine) setHoverBar(i); }}
+              >
+                {val > 0 && (
+                  <span className={`text-[7px] font-bold mb-0.5 leading-none transition-all duration-150 ${isActive ? 'text-[color:var(--text-primary)] scale-125' : 'text-[color:var(--text-muted)]'}`}>
+                    {formatVNDShort(val)}
+                  </span>
+                )}
+                <div
+                  className="w-full rounded-t-md transition-all duration-200"
+                  style={{
+                    height: h,
+                    backgroundColor: isToday
+                      ? 'var(--accent)'
+                      : aboveAvg
+                        ? '#F4845F'
+                        : 'var(--chart-muted)',
+                    opacity: isActive ? 1 : isToday ? 1 : 0.7,
+                    transform: isActive ? 'scaleX(1.15)' : 'scaleX(1)',
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+        {/* Trend line (visual only) */}
+        {n >= 2 && (
+          <svg
+            className="absolute inset-0 w-full pointer-events-none transition-all duration-200"
+            style={{
+              height: chartH - labelH,
+              opacity: lineBlurred ? 0.2 : 1,
+              filter: lineBlurred ? 'blur(1.5px)' : 'none',
+            }}
+            viewBox={`0 0 100 ${chartH - labelH}`}
+            preserveAspectRatio="none"
+          >
+            <path
+              d={smoothPath(movingAvg)}
+              fill="none"
+              stroke="#4D96FF"
+              strokeWidth={hoverLine ? '2.5' : '1.5'}
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              className="transition-all duration-200"
+            />
+            {hoverLine && lineIdx >= 0 && (() => {
+              const cx = (lineIdx / (n - 1)) * 100;
+              const cy = topPad + barAreaH - (movingAvg[lineIdx] / max) * barAreaH;
+              return (
+                <circle cx={cx} cy={cy} r="4" fill="#4D96FF" stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+              );
+            })()}
+          </svg>
+        )}
+        {/* Trend line hover tooltip */}
+        {hoverLine && lineIdx >= 0 && n >= 2 && (
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: `${(lineIdx / (n - 1)) * 100}%`,
+              top: topPad + barAreaH - (movingAvg[lineIdx] / max) * barAreaH - 22,
+              transform: 'translateX(-50%)',
+            }}
+          >
+            <span className="rounded-md bg-sky px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm whitespace-nowrap">
+              {formatVNDShort(Math.round(movingAvg[lineIdx]))}
+            </span>
+          </div>
+        )}
+        {/* Date labels */}
+        <div className="absolute bottom-0 left-0 right-0 flex gap-1 pointer-events-none" style={{ height: labelH }}>
+          {series.map((item, i) => (
+            <span
+              key={item.date}
+              className={`flex-1 text-center text-[8px] font-semibold transition-colors duration-150 ${hoverBar === i ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-muted)]'}`}
+            >
+              {item.date.slice(8)}
+            </span>
+          ))}
+        </div>
       </div>
-      {/* Average line indicator */}
-      <div className="mt-1 flex items-center gap-2 text-[10px] font-semibold text-[color:var(--text-muted)]">
-        <span className="inline-block h-0.5 w-3 bg-coral/50" />
-        Trên trung bình
-        <span className="inline-block h-0.5 w-3 rounded-sm" style={{ backgroundColor: 'var(--chart-muted)' }} />
-        Bình thường
+      {/* Legend */}
+      <div className="mt-1.5 flex items-center gap-3 text-[10px] font-semibold text-[color:var(--text-muted)]">
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-0.5 w-3 bg-coral/50 rounded-full" />
+          Trên TB
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-0.5 w-3 rounded-full" style={{ backgroundColor: 'var(--chart-muted)' }} />
+          Bình thường
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-0.5 w-3 rounded-full bg-sky" />
+          Xu hướng
+        </span>
       </div>
     </div>
   );
