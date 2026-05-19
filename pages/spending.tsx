@@ -27,19 +27,47 @@ function toDateInputValue(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function getClientDateRange(range: string, month: number, year: number) {
-  const now = new Date();
+function getClientDateRange(range: string, month: number, year: number, offset: number = 0) {
+  const VN_MS = 7 * 60 * 60 * 1000;
+  const vn = new Date(Date.now() + VN_MS);
+  const vY = vn.getUTCFullYear(), vM = vn.getUTCMonth(), vD = vn.getUTCDate();
+
   if (range === 'week') {
-    const day = now.getDay();
-    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((day + 6) % 7));
-    const sunday = new Date(monday);
-    sunday.setDate(sunday.getDate() + 6);
-    return { startDate: toDateInputValue(monday), endDate: toDateInputValue(sunday) };
+    const day = new Date(Date.UTC(vY, vM, vD)).getUTCDay();
+    const mondayD = vD - ((day + 6) % 7) + offset * 7;
+    const mon = new Date(Date.UTC(vY, vM, mondayD));
+    const sun = new Date(Date.UTC(vY, vM, mondayD + 6));
+    return {
+      startDate: toDateInputValue(new Date(mon.getUTCFullYear(), mon.getUTCMonth(), mon.getUTCDate())),
+      endDate: toDateInputValue(new Date(sun.getUTCFullYear(), sun.getUTCMonth(), sun.getUTCDate())),
+    };
   }
+  const m = month - 1 + offset;
   return {
-    startDate: toDateInputValue(new Date(year, month - 1, 1)),
-    endDate: toDateInputValue(new Date(year, month, 0)),
+    startDate: toDateInputValue(new Date(year, m, 1)),
+    endDate: toDateInputValue(new Date(year, m + 1, 0)),
   };
+}
+
+const VN_WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+function getDateRangeLabel(range: string, month: number, year: number, offset: number = 0) {
+  const VN_MS = 7 * 60 * 60 * 1000;
+  const vn = new Date(Date.now() + VN_MS);
+  const vY = vn.getUTCFullYear(), vM = vn.getUTCMonth(), vD = vn.getUTCDate();
+  const p = (n: number) => (n < 10 ? `0${n}` : String(n));
+
+  if (range === 'week') {
+    const day = vn.getUTCDay();
+    const mondayD = vD - ((day + 6) % 7) + offset * 7;
+    const monDate = new Date(Date.UTC(vY, vM, mondayD));
+    const sunDate = new Date(Date.UTC(vY, vM, mondayD + 6));
+    return `${p(monDate.getUTCDate())}/${p(monDate.getUTCMonth() + 1)} - ${p(sunDate.getUTCDate())}/${p(sunDate.getUTCMonth() + 1)}`;
+  }
+  const m = month - 1 + offset;
+  const mStart = new Date(year, m, 1);
+  const mEnd = new Date(year, m + 1, 0);
+  return `Tháng ${mStart.getMonth() + 1}/${mStart.getFullYear()}`;
 }
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -52,16 +80,29 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
-function DailySpendingChart({ daily }: { daily: any[] }) {
+function DailySpendingChart({ daily, prevDaily = [] }: { daily: any[]; prevDaily?: any[] }) {
   const series = daily.slice(-14);
   const [hoverBar, setHoverBar] = useState(-1);
   const [hoverLine, setHoverLine] = useState(false);
   const [lineIdx, setLineIdx] = useState(-1);
+  const [showComparison, setShowComparison] = useState(true);
 
   if (!series.length) return null;
 
   const expenses = series.map(d => d.expense || 0);
-  const max = Math.max(...expenses, 1);
+
+  // Map previous period by day-of-month for overlay
+  const prevByDay: Record<string, number> = {};
+  prevDaily.forEach((d: any) => {
+    const dayNum = d.date.slice(8); // "DD"
+    prevByDay[dayNum] = (prevByDay[dayNum] || 0) + (d.expense || 0);
+  });
+  const prevExpenses = series.map(d => {
+    const dayNum = d.date.slice(8);
+    return prevByDay[dayNum] || 0;
+  });
+  const hasPrev = prevExpenses.some(v => v > 0);
+  const max = Math.max(...expenses, ...(hasPrev && showComparison ? prevExpenses : []), 1);
   const avg = expenses.reduce((s, v) => s + v, 0) / Math.max(expenses.length, 1);
 
   const chartH = 140;
@@ -104,11 +145,26 @@ function DailySpendingChart({ daily }: { daily: any[] }) {
 
   return (
     <div>
-      <div className="mb-2 flex items-baseline justify-between">
+      <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-bold">{L.analytics.trend}</h3>
-        <span className="text-[10px] font-semibold text-[color:var(--text-muted)]">
-          TB: {formatVNDShort(avg)}
-        </span>
+        <div className="flex items-center gap-3">
+          {hasPrev && (
+            <button
+              type="button"
+              onClick={() => setShowComparison(!showComparison)}
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-all ${
+                showComparison
+                  ? 'bg-nero/8 text-[color:var(--text-primary)] dark:bg-white/10'
+                  : 'text-[color:var(--text-muted)] hover:bg-nero/4 dark:hover:bg-white/4'
+              }`}
+            >
+              So k\u1ef3 tr\u01b0\u1edbc
+            </button>
+          )}
+          <span className="text-[10px] font-semibold text-[color:var(--text-muted)]">
+            TB: {formatVNDShort(avg)}
+          </span>
+        </div>
       </div>
       <div
         className="relative"
@@ -188,6 +244,19 @@ function DailySpendingChart({ daily }: { daily: any[] }) {
             viewBox={`0 0 100 ${chartH - labelH}`}
             preserveAspectRatio="none"
           >
+            {/* Previous period comparison line */}
+            {hasPrev && showComparison && (
+              <path
+                d={smoothPath(prevExpenses)}
+                fill="none"
+                stroke="var(--text-muted)"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeDasharray="4 3"
+                vectorEffect="non-scaling-stroke"
+                opacity="0.4"
+              />
+            )}
             <path
               d={smoothPath(movingAvg)}
               fill="none"
@@ -234,7 +303,7 @@ function DailySpendingChart({ daily }: { daily: any[] }) {
         </div>
       </div>
       {/* Legend */}
-      <div className="mt-1.5 flex items-center gap-3 text-[10px] font-semibold text-[color:var(--text-muted)]">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-[color:var(--text-muted)]">
         <span className="flex items-center gap-1">
           <span className="inline-block h-0.5 w-3 bg-coral/50 rounded-full" />
           Trên TB
@@ -247,6 +316,12 @@ function DailySpendingChart({ daily }: { daily: any[] }) {
           <span className="inline-block h-0.5 w-3 rounded-full bg-sky" />
           Xu hướng
         </span>
+        {hasPrev && showComparison && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-0.5 w-3 rounded-full border-t border-dashed border-[color:var(--text-muted)]" />
+            Kỳ trước
+          </span>
+        )}
       </div>
     </div>
   );
@@ -298,16 +373,20 @@ export default function SpendingPage() {
   const year = now.getFullYear();
   const { chartType } = useTheme();
   const [range, setRange] = useState('month');
+  const [offset, setOffset] = useState(0);
   const [selectedTx, setSelectedTx] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [drillCategory, setDrillCategory] = useState<string | null>(null);
+
+  const handleRangeChange = (r: string) => { setRange(r); setOffset(0); };
 
   const { data: summary, isLoading, mutate: mutateSummary } = useSWR(
-    `/api/transactions/summary?month=${month}&year=${year}&range=${range}`,
+    `/api/transactions/summary?month=${month}&year=${year}&range=${range}&offset=${offset}`,
     fetcher,
     { refreshInterval: 30000 }
   );
 
-  const selectedRange = getClientDateRange(range, month, year);
+  const selectedRange = getClientDateRange(range, month, year, offset);
   const categoryBreakdownTotal = (summary?.categoryBreakdown || []).reduce((s: number, i: any) => s + i.total, 0);
   const selectedCategorySummaryRaw = summary?.categoryBreakdown?.find((item: any) => item.category === selectedCategory);
   const selectedCategorySummary = selectedCategorySummaryRaw
@@ -330,6 +409,18 @@ export default function SpendingPage() {
     mutate: mutateCategoryTransactions,
   } = useSWR(selectedCategory ? `/api/transactions?${categoryTxParams}` : null, fetcher, { refreshInterval: 30000 });
 
+  // Donut drill-down fetch
+  const drillTxParams = new URLSearchParams({
+    limit: '100',
+    category: drillCategory || '',
+    type: 'expense',
+    startDate: selectedRange.startDate,
+    endDate: selectedRange.endDate,
+  });
+  const { data: drillTransactions, isLoading: drillLoading } = useSWR(
+    drillCategory ? `/api/transactions?${drillTxParams}` : null, fetcher
+  );
+
   const loading = isLoading || !summary;
   const totalExpense = summary?.totalExpense || 0;
   const avgDaily = summary?.avgDailySpending || 0;
@@ -343,7 +434,43 @@ export default function SpendingPage() {
         <h1 className="text-2xl font-bold tracking-[-0.04em]">{L.analytics.title}</h1>
       </div>
 
-      <Segmented options={RANGES} value={range} onChange={setRange} className="mb-4" />
+      <div className="flex items-center gap-3 mb-4">
+        <Segmented options={RANGES} value={range} onChange={handleRangeChange} className="flex-1" />
+        <div
+          className="inline-flex items-center gap-1 rounded-full py-1.5 px-1.5 shrink-0"
+          style={{
+            background: 'var(--surface-soft)',
+            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06), 0 1px 1px rgba(255,255,255,0.7)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setOffset(offset - 1)}
+            className="flex h-6 w-6 items-center justify-center rounded-full transition-all active:scale-90 hover:scale-110 hover:shadow-md"
+            style={{
+              background: 'var(--surface-card)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 1px rgba(0,0,0,0.04)',
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          <span className="text-[10px] font-bold px-1.5 min-w-0 select-none whitespace-nowrap">
+            {getDateRangeLabel(range, month, year, offset)}
+          </span>
+          <button
+            type="button"
+            onClick={() => setOffset(offset + 1)}
+            disabled={offset >= 0}
+            className="flex h-6 w-6 items-center justify-center rounded-full transition-all active:scale-90 hover:scale-110 hover:shadow-md disabled:opacity-25 disabled:pointer-events-none"
+            style={{
+              background: 'var(--surface-card)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 1px rgba(0,0,0,0.04)',
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
 
       {loading ? (
         <div className="space-y-4">
@@ -378,7 +505,7 @@ export default function SpendingPage() {
           {/* ─── Daily Spending Trend ─── */}
           {(summary?.dailySpending?.length || 0) > 0 && (
             <Card>
-              <DailySpendingChart daily={summary.dailySpending} />
+              <DailySpendingChart daily={summary.dailySpending} prevDaily={summary.prevDailySpending} />
             </Card>
           )}
 
@@ -390,6 +517,9 @@ export default function SpendingPage() {
               daily={summary.dailySpending || []}
               chartType={chartType}
               onSelectCategory={setSelectedCategory}
+              onDrillCategory={setDrillCategory}
+              drillTransactions={drillTransactions?.data}
+              drillLoading={drillLoading}
             />
           </Card>
 

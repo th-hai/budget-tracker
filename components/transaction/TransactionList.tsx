@@ -32,8 +32,15 @@ export default function TransactionList({ transactions, onSelect }: TransactionL
 
   if (transactions.length === 0) {
     return (
-      <div className="text-center py-14">
-        <p className="text-3xl opacity-15 mb-3">📋</p>
+      <div className="text-center py-14 flex flex-col items-center">
+        <svg width="52" height="52" viewBox="0 0 52 52" fill="none" className="mb-3 opacity-12">
+          <rect x="8" y="6" width="36" height="40" rx="5" stroke="currentColor" strokeWidth="2"/>
+          <line x1="15" y1="17" x2="37" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          <line x1="15" y1="24" x2="31" y2="24" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          <line x1="15" y1="31" x2="34" y2="31" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          <circle cx="38" cy="38" r="9" fill="var(--surface-card)" stroke="currentColor" strokeWidth="2"/>
+          <path d="M35 38h6M38 35v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
         <p className="text-sm font-semibold opacity-30">{L.transactions.emptyList}</p>
         <p className="text-xs font-medium opacity-20 mt-1">{L.transactions.emptyListHint}</p>
       </div>

@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import useSWR from 'swr';
 import fetcher from '@/lib/api';
 import { formatVND, formatVNDShort, formatDateSmart, formatTime, toVNDateKey } from '@/lib/format';
+import { useSwipe, usePullToRefresh } from '@/lib/gestures';
 import PageShell from '@/components/layout/PageShell';
 import Card from '@/components/ui/Card';
 import Segmented from '@/components/ui/Segmented';
@@ -227,6 +228,11 @@ export default function Dashboard() {
 
   const handleRangeChange = (r: string) => { setRange(r); setOffset(0); };
 
+  const swipeHandlers = useSwipe({
+    onSwipeLeft: useCallback(() => setOffset(o => o - 1), []),
+    onSwipeRight: useCallback(() => setOffset(o => Math.min(0, o + 1)), []),
+  });
+
   const { data: summary, isLoading: summaryLoading, mutate: mutateSummary } = useSWR(
     `/api/transactions/summary?month=${month}&year=${year}&range=${range}&offset=${offset}`,
     fetcher,
@@ -237,6 +243,14 @@ export default function Dashboard() {
     fetcher,
     { refreshInterval: 30000 }
   );
+
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: useCallback(async () => {
+      await Promise.all([mutateSummary(), mutateRecent()]);
+    }, [mutateSummary, mutateRecent]),
+  });
+
+  const [drillCategory, setDrillCategory] = useState<string | null>(null);
 
   const categoryBreakdownTotal = (summary?.categoryBreakdown || []).reduce((sum: number, item: any) => sum + item.total, 0);
   const selectedCategorySummaryRaw = summary?.categoryBreakdown?.find((item: any) => item.category === selectedCategory);
@@ -260,6 +274,19 @@ export default function Dashboard() {
     mutate: mutateCategoryTransactions,
   } = useSWR(selectedCategory ? `/api/transactions?${categoryTxParams}` : null, fetcher, { refreshInterval: 30000 });
 
+  // Donut drill-down: separate fetch from the bottom sheet
+  const drillTxParams = new URLSearchParams({
+    limit: '100',
+    category: drillCategory || '',
+    type: 'expense',
+    startDate: selectedRange.startDate,
+    endDate: selectedRange.endDate,
+  });
+  const {
+    data: drillTransactions,
+    isLoading: drillLoading,
+  } = useSWR(drillCategory ? `/api/transactions?${drillTxParams}` : null, fetcher);
+
   const loading = summaryLoading || !summary;
   const recentGrouped = (() => {
     if (!recent?.data?.length) return [];
@@ -282,9 +309,26 @@ export default function Dashboard() {
   const actualSaving = summary?.actualSaving || 0;
   const savingPct = savingGoal > 0 ? Math.round((actualSaving / savingGoal) * 100) : 0;
   const insight = getInsightMessage(summary, range);
+  const streak = summary?.streak || 0;
 
   return (
     <PageShell>
+      {/* Pull-to-refresh indicator */}
+      <div
+        ref={pullToRefresh.indicatorRef}
+        className="flex justify-center -mt-8 mb-2 opacity-0"
+        style={{ transition: 'none' }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="animate-spin" style={{ color: 'var(--accent)' }}>
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity="0.25"/>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </div>
+      <div
+        onTouchStart={(e) => { swipeHandlers.onTouchStart(e); pullToRefresh.onTouchStart(e); }}
+        onTouchMove={pullToRefresh.onTouchMove}
+        onTouchEnd={(e) => { swipeHandlers.onTouchEnd(e); pullToRefresh.onTouchEnd(); }}
+      >
       <div className="mb-6 flex items-end justify-between">
         <div>
           <p className="mb-1 text-xs font-semibold text-[color:var(--text-muted)]">Tháng {month}/{year}</p>
@@ -382,6 +426,25 @@ export default function Dashboard() {
             </div>
           </Card>
 
+          {/* ─── Streak ─── */}
+          {range === 'month' && budgetGoal > 0 && streak > 0 && (
+            <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ background: 'var(--surface-soft)' }}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber/15">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2c.5 4-3 6-3 10a5 5 0 0 0 10 0c0-4-2-6-3-8-1 2-3 3-4 3s1-3 0-5z" fill="#F59E0B" stroke="#F59E0B" strokeWidth="1.5" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold">
+                  <span className="text-amber-deep">{streak}</span> ngày liên tiếp dưới hạn mức
+                </p>
+                <p className="text-[11px] font-medium text-[color:var(--text-muted)]">
+                  {streak >= 14 ? 'Tuyệt vời! Giữ vững phong độ!' : streak >= 7 ? 'Rất tốt! Tiếp tục duy trì nhé!' : 'Khởi đầu tốt, hãy duy trì!'}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ─── Daily Allowance ─── */}
           {range === 'month' && (
             <Card>
@@ -478,6 +541,9 @@ export default function Dashboard() {
               chartType={chartType}
               daysInRange={range === 'today' ? 1 : range === 'week' ? 7 : summary.daysInMonth || 30}
               onSelectCategory={setSelectedCategory}
+              onDrillCategory={setDrillCategory}
+              drillTransactions={drillTransactions?.data}
+              drillLoading={drillLoading}
             />
           </Card>
 
@@ -489,9 +555,19 @@ export default function Dashboard() {
             </div>
             {recentGrouped.length > 0 ? (
               <div className="space-y-3">
-                {recentGrouped.map(([date, txs]) => (
+                {recentGrouped.map(([date, txs]) => {
+                  const dayTotal = txs.reduce((sum: number, tx: any) => {
+                    if (tx.category === 'saving') return sum;
+                    return sum + (tx.type === 'expense' ? -tx.amount : tx.amount);
+                  }, 0);
+                  return (
                   <div key={date}>
-                    <p className="mb-1.5 px-1 text-[11px] font-bold text-[color:var(--text-muted)]">{formatDateSmart(date)}</p>
+                    <div className="flex justify-between items-baseline mb-1.5 px-1">
+                      <p className="text-[11px] font-bold text-[color:var(--text-muted)]">{formatDateSmart(date)}</p>
+                      <span className={`text-[11px] font-bold ${dayTotal >= 0 ? 'text-emerald-500' : 'text-coral'}`}>
+                        {dayTotal >= 0 ? '+' : '-'}{formatVNDShort(Math.abs(dayTotal))}
+                      </span>
+                    </div>
                     <Card density="compact" className="p-2">
                       {txs.map((tx: any, i: number) => (
                         <div key={tx._id}>
@@ -501,12 +577,18 @@ export default function Dashboard() {
                       ))}
                     </Card>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <Card>
-                <div className="py-8 text-center">
-                  <p className="mb-2 text-2xl opacity-20">📋</p>
+                <div className="py-8 text-center flex flex-col items-center">
+                  <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="mb-3 opacity-15">
+                    <rect x="8" y="6" width="32" height="36" rx="4" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="14" y1="16" x2="34" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <line x1="14" y1="22" x2="28" y2="22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <line x1="14" y1="28" x2="31" y2="28" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
                   <p className="text-sm font-semibold text-[color:var(--text-muted)]">{L.dashboard.emptyTransactions}</p>
                   <p className="mt-0.5 text-xs font-medium opacity-30">{L.dashboard.emptyTransactionsHint}</p>
                 </div>
@@ -515,6 +597,8 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      </div>
 
       <TransactionDetail
         transaction={selectedTx}

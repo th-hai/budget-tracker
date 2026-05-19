@@ -81,7 +81,14 @@ export default async function handler(
     category: { $ne: 'saving' },
   };
 
-  const [totals, categoryBreakdown, dailySpending, budgetGoal, savingTotal, prevTotals] =
+  // Previous period daily spending (for month-over-month comparison)
+  const prevDailyFilter = {
+    transactionDate: { $gte: prev.start, $lte: prev.end },
+    categorized: true,
+    category: { $ne: 'saving' },
+  };
+
+  const [totals, categoryBreakdown, dailySpending, budgetGoal, savingTotal, prevTotals, prevDailySpending] =
     await Promise.all([
       Transaction.aggregate([
         { $match: noSavingFilter },
@@ -132,6 +139,20 @@ export default async function handler(
         { $match: prevFilter },
         { $group: { _id: '$type', total: { $sum: '$amount' } } },
       ]),
+      // Previous period daily spending
+      Transaction.aggregate([
+        { $match: prevDailyFilter },
+        {
+          $group: {
+            _id: {
+              date: { $dateToString: { format: '%Y-%m-%d', date: '$transactionDate', timezone: 'Asia/Ho_Chi_Minh' } },
+              type: '$type',
+            },
+            total: { $sum: '$amount' },
+          },
+        },
+        { $sort: { '_id.date': 1 } },
+      ]),
     ]);
 
   const totalIncome =
@@ -167,6 +188,18 @@ export default async function handler(
     .map(([date, values]) => ({ date, ...values }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  // Group previous period daily spending (by day-of-month for overlay comparison)
+  const prevDailyMap: Record<string, { income: number; expense: number }> = {};
+  prevDailySpending.forEach((d: any) => {
+    if (!prevDailyMap[d._id.date]) {
+      prevDailyMap[d._id.date] = { income: 0, expense: 0 };
+    }
+    prevDailyMap[d._id.date][d._id.type as 'income' | 'expense'] = d.total;
+  });
+  const prevDaily = Object.entries(prevDailyMap)
+    .map(([date, values]) => ({ date, ...values }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
   // Previous period comparison
   const prevExpense = prevTotals.find((t: any) => t._id === 'expense')?.total || 0;
   const spendingChange = prevExpense > 0
@@ -185,6 +218,31 @@ export default async function handler(
   // Average daily spending so far this month
   const avgDailySpending = dayOfMonth > 0 ? Math.round(totalExpense / dayOfMonth) : 0;
 
+  // ─── Streak: days under daily budget ───
+  let streak = 0;
+  if (budget > 0) {
+    const dailyBudget = Math.round(budget / daysInMonth);
+    // Get last 60 days of daily expense data
+    const streakStart = vnMidnightUTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate() - 59);
+    const streakEnd = new Date(vnMidnightUTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate() + 1).getTime() - 1);
+    const streakData = await Transaction.aggregate([
+      { $match: { transactionDate: { $gte: streakStart, $lte: streakEnd }, categorized: true, type: 'expense', category: { $ne: 'saving' } } },
+      { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$transactionDate', timezone: 'Asia/Ho_Chi_Minh' } }, total: { $sum: '$amount' } } },
+      { $sort: { _id: -1 } },
+    ]);
+    const expenseByDate: Record<string, number> = {};
+    streakData.forEach((d: any) => { expenseByDate[d._id] = d.total; });
+
+    // Count consecutive days (from yesterday backwards) where spending <= dailyBudget
+    for (let i = 1; i <= 60; i++) {
+      const d = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate() - i));
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      const dayExpense = expenseByDate[key] || 0;
+      if (dayExpense <= dailyBudget) streak++;
+      else break;
+    }
+  }
+
   return res.json({
     month,
     year,
@@ -198,12 +256,13 @@ export default async function handler(
     actualSaving: savingTotal[0]?.total || 0,
     categoryBreakdown: categories,
     dailySpending: daily,
-    // New spending behavior fields
+    prevDailySpending: prevDaily,
     spendingChange,
     prevExpense,
     dailyAllowance,
     avgDailySpending,
     daysLeft,
     daysInMonth,
+    streak,
   });
 }
